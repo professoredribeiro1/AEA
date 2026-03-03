@@ -1,0 +1,5 @@
+{
+  "name": "Amor em Ação",
+  "description": "Amor em Ação - Seu relacionamento blindado dia a dia.",
+  "requestFramePermissions": ["notifications"]
+}
