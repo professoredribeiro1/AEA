@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { LoveLanguage, UserProfile, Challenge, Mission, SubscriptionInfo, Message, TankTheme, GratitudeEntry } from './types';
 import { LANGUAGE_METADATA } from './constants.tsx';
@@ -13,14 +12,15 @@ import MyChallenges from './components/MyChallenges';
 import GratitudeJournal from './components/GratitudeJournal';
 import LandingPage from './components/LandingPage';
 import { generateDailyMission, getMissionCompletionFeedback } from './services/geminiService';
-import { 
-  Heart, Sparkles, Calendar, Trophy, 
+import { supabase } from './services/supabase';
+import {
+  Heart, Sparkles, Calendar, Trophy,
   ChevronRight, UserPlus, Link2, Sun, Compass, TrendingUp, Clock3, LogOut
 } from 'lucide-react';
 
 const App: React.FC = () => {
   const emptyChallenge: Challenge = { type: null, startDate: null, missions: [], cycleCount: 1 };
-  
+
   const getInitialSubscription = (): SubscriptionInfo => {
     const saved = localStorage.getItem('love_user_v4');
     if (saved) {
@@ -30,24 +30,23 @@ const App: React.FC = () => {
     return { status: 'trial', plan: 'none', trialStartedAt: new Date().toISOString(), expiresAt: null };
   };
 
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('love_auth_v4') === 'true';
-  });
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [sessionLoading, setSessionLoading] = useState(true);
 
   const [user, setUser] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('love_user_v4');
-    return saved ? JSON.parse(saved) : { 
+    return saved ? JSON.parse(saved) : {
       name: '', languages: [], tankLevel: 5, challenge: emptyChallenge,
       hasFinishedTutorial: false, subscription: getInitialSubscription(), notificationsEnabled: false,
       soundEnabled: true,
-      coupleCode: Math.random().toString(36).substring(2, 8).toUpperCase(), isLinked: false, 
+      coupleCode: Math.random().toString(36).substring(2, 8).toUpperCase(), isLinked: false,
       tankTheme: TankTheme.MODERN, gratitudeJournal: []
     };
   });
 
   const [partner, setPartner] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('love_partner_v4');
-    return saved ? JSON.parse(saved) : { 
+    return saved ? JSON.parse(saved) : {
       name: 'Parceiro(a)', languages: [], tankLevel: 5, challenge: emptyChallenge,
       hasFinishedTutorial: true, subscription: getInitialSubscription(), notificationsEnabled: false,
       soundEnabled: true,
@@ -68,19 +67,68 @@ const App: React.FC = () => {
     onToggleNotifications: (enabled) => setUser(p => ({ ...p, notificationsEnabled: enabled }))
   });
 
-  useEffect(() => { localStorage.setItem('love_user_v4', JSON.stringify(user)); }, [user]);
-  useEffect(() => { localStorage.setItem('love_partner_v4', JSON.stringify(partner)); }, [partner]);
-  useEffect(() => { localStorage.setItem('love_auth_v4', isAuthenticated.toString()); }, [isAuthenticated]);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthenticated(!!session);
+      if (session?.user) {
+        setUser(prev => ({ ...prev, name: session.user.user_metadata.full_name || 'Usuário' }));
+        fetchUserProfile(session.user.id);
+      }
+      setSessionLoading(false);
+    });
 
-  const handleLogin = (name: string) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
+      if (session?.user) {
+        setUser(prev => ({ ...prev, name: session.user.user_metadata.full_name || 'Usuário' }));
+        fetchUserProfile(session.user.id);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('subscription_status, plan_type, expires_at')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        // Ignora erro se não encontrou (pode estar criando o trigger)
+        console.error("Erro ao buscar perfil:", error);
+      } else if (data) {
+        setUser(prev => ({
+          ...prev,
+          subscription: {
+            status: (data.subscription_status === 'trialing' || data.subscription_status === 'active') ? data.subscription_status : 'expired',
+            plan: data.plan_type as any,
+            trialStartedAt: prev.subscription.trialStartedAt,
+            expiresAt: data.expires_at
+          }
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => { if (!sessionLoading) localStorage.setItem('love_user_v4', JSON.stringify(user)); }, [user, sessionLoading]);
+  useEffect(() => { if (!sessionLoading) localStorage.setItem('love_partner_v4', JSON.stringify(partner)); }, [partner, sessionLoading]);
+
+  const handleLogin = (name: string, session?: any) => {
     setUser(prev => ({ ...prev, name }));
     setIsAuthenticated(true);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setIsAuthenticated(false);
     setActiveTab('dashboard');
-    localStorage.removeItem('love_auth_v4');
   };
 
   const handleRedoMission = (id: string) => {
@@ -89,7 +137,7 @@ const App: React.FC = () => {
 
     // Se o usuário quiser refazer uma missão já concluída
     if (mission.completed) {
-      const updatedMissions = partner.challenge.missions.map(m => 
+      const updatedMissions = partner.challenge.missions.map(m =>
         m.id === id ? { ...m, completed: false, aiFeedback: undefined } : m
       );
       setPartner(prev => ({
@@ -137,7 +185,7 @@ const App: React.FC = () => {
       const targetLang = mission.languageApplied || partner.languages[0];
       const currentCycle = partner.challenge.cycleCount || 1;
       const lighterData = await generateDailyMission(targetLang, partner.name, mission.day, currentCycle, true);
-      
+
       const lighterMission: Mission = {
         id: Math.random().toString(36).substr(2, 9),
         day: mission.day,
@@ -151,7 +199,7 @@ const App: React.FC = () => {
       };
 
       // Substitui a missão atual pela nova missão leve (não mantém a antiga no histórico)
-      const updatedMissions = partner.challenge.missions.map(m => 
+      const updatedMissions = partner.challenge.missions.map(m =>
         m.id === mission.id ? lighterMission : m
       );
 
@@ -160,11 +208,11 @@ const App: React.FC = () => {
         challenge: { ...prev.challenge, missions: updatedMissions }
       }));
       setIsReadyForMission(false); // Volta para o estado de visualização para a nova missão
-      
-      const skipMessage = mission.isAlternative 
+
+      const skipMessage = mission.isAlternative
         ? "Tudo bem. O mais importante é o seu coração estar em paz. Vamos tentar algo ainda mais simples e restaurador. Lembre-se: o amor também é ter paciência consigo mesmo."
         : "Entendo perfeitamente. O amor também é saber respeitar o próprio tempo. Por enquanto, preparamos algo mais leve e diferente para você realizar hoje.";
-      
+
       alert(skipMessage);
     } finally {
       setLoadingMission(false);
@@ -178,17 +226,17 @@ const App: React.FC = () => {
     try {
       const result = await getMissionCompletionFeedback(mission, partner.name, fulfillmentText);
       const { feedback, impact = 0, success } = result;
-      
+
       if (success) {
         setShowCelebration(true);
         setIsReadyForMission(false);
         setTimeout(() => setShowCelebration(false), 4000);
-        const updatedMissions = partner.challenge.missions.map(m => 
+        const updatedMissions = partner.challenge.missions.map(m =>
           m.id === mission.id ? { ...m, completed: true, completedAt: new Date().toISOString(), aiFeedback: feedback } : m
         );
         const nextDay = mission.day + 1;
         const currentCycle = partner.challenge.cycleCount || 1;
-        
+
         if (nextDay <= (partner.challenge.type || 0)) {
           const targetLang = nextDay % 2 !== 0 ? partner.languages[0] : partner.languages[1];
           const nextData = await generateDailyMission(targetLang, partner.name, nextDay, currentCycle);
@@ -254,8 +302,45 @@ const App: React.FC = () => {
     }
   };
 
+  if (sessionLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-12 h-12 border-4 border-rose-200 border-t-rose-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return <LandingPage onLogin={handleLogin} />;
+  }
+
+  // Verificar se o usuário tem assinatura ativa ('active' ou 'trialing')
+  const hasActiveSubscription = user.subscription?.status === 'active' || user.subscription?.status === 'trialing';
+
+  if (!hasActiveSubscription) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white p-6">
+        <div className="max-w-md w-full bg-rose-50 border border-rose-100 p-10 rounded-[3rem] text-center shadow-2xl relative overflow-hidden">
+          <Heart className="w-20 h-20 text-rose-500 mx-auto mb-6 opacity-50" />
+          <h2 className="text-3xl font-black text-rose-950 mb-4">Assinatura Inativa</h2>
+          <p className="text-slate-600 font-medium mb-8">
+            Sua assinatura ou período de teste encerrou. Para continuar tendo acesso ao check-up diário do seu casamento, missões personalizadas e o conselheiro pastoral, reative seu plano.
+          </p>
+          <button
+            onClick={() => window.location.href = 'https://pay.kiwify.com.br/MlAXRDE'} // Redirecionando para o plano trimestral como padrão de renovação
+            className="w-full py-4 bg-rose-600 text-white rounded-2xl font-black text-lg hover:bg-rose-700 transition-all shadow-xl shadow-rose-200"
+          >
+            Renovar Assinatura
+          </button>
+          <button
+            onClick={handleLogout}
+            className="w-full mt-4 py-4 bg-white text-slate-500 rounded-2xl font-bold text-sm hover:text-slate-700 transition-all"
+          >
+            Sair da Conta
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const renderContent = () => {
@@ -264,80 +349,80 @@ const App: React.FC = () => {
         return (
           <div className="space-y-12 animate-in fade-in pb-20">
             <div className="md:hidden">
-               <NotificationManager 
-                  user={user} 
-                  partner={partner} 
-                  onToggleNotifications={(e) => setUser(p => ({ ...p, notificationsEnabled: e }))} 
-                  onToggleSound={(e) => setUser(p => ({ ...p, soundEnabled: e }))} 
-                  onTestNotification={() => sendNotification("Teste de Lembrete", "Seu sistema de lembretes está funcionando perfeitamente! ❤️")}
-                />
+              <NotificationManager
+                user={user}
+                partner={partner}
+                onToggleNotifications={(e) => setUser(p => ({ ...p, notificationsEnabled: e }))}
+                onToggleSound={(e) => setUser(p => ({ ...p, soundEnabled: e }))}
+                onTestNotification={() => sendNotification("Teste de Lembrete", "Seu sistema de lembretes está funcionando perfeitamente! ❤️")}
+              />
             </div>
             <section className="relative group">
-               <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-[3.5rem] blur opacity-10 group-hover:opacity-25 transition duration-1000"></div>
-               <div className="relative glass-card p-10 md:p-14 rounded-[3.5rem] flex flex-col md:flex-row justify-between items-center gap-10">
-                  <div className="flex-1 space-y-6">
-                    <div className="inline-flex items-center gap-2 px-5 py-2 bg-rose-50 text-rose-600 rounded-full text-xs font-black uppercase tracking-widest border border-rose-100">
-                      <Clock3 className="w-4 h-4" /> Micro-Ação do Dia
-                    </div>
-                    <h2 className="text-4xl md:text-5xl font-black text-rose-950 leading-tight">Pronto para blindar seu amor <span className="text-rose-600 italic">hoje?</span></h2>
-                    <p className="text-slate-500 text-lg max-w-lg font-medium">Pequenos gestos de Amor Sacrificial feitos com intenção transformam o ambiente da sua casa.</p>
-                    <div className="flex flex-wrap gap-4 pt-4">
-                      <button onClick={() => setActiveTab('challenge')} className="px-10 py-5 bg-rose-600 text-white rounded-[2rem] font-black text-lg hover:bg-rose-700 transition-all shadow-2xl shadow-rose-200 flex items-center gap-3">
-                         {partner.challenge.type ? 'Abrir Missão' : 'Iniciar 60 Dias'} <ChevronRight className="w-5 h-5" />
-                      </button>
-                      <button onClick={() => setActiveTab('coach')} className="px-8 py-5 bg-white border border-rose-100 text-rose-900 rounded-[2rem] font-bold text-lg hover:bg-rose-50 transition-all flex items-center gap-3 shadow-sm">
-                         Aconselhamento Pastoral <Compass className="w-5 h-5 text-rose-400" />
-                      </button>
-                    </div>
+              <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-[3.5rem] blur opacity-10 group-hover:opacity-25 transition duration-1000"></div>
+              <div className="relative glass-card p-10 md:p-14 rounded-[3.5rem] flex flex-col md:flex-row justify-between items-center gap-10">
+                <div className="flex-1 space-y-6">
+                  <div className="inline-flex items-center gap-2 px-5 py-2 bg-rose-50 text-rose-600 rounded-full text-xs font-black uppercase tracking-widest border border-rose-100">
+                    <Clock3 className="w-4 h-4" /> Micro-Ação do Dia
                   </div>
-                  <div className="w-full md:w-1/3 flex justify-center">
-                    <div className="w-48 h-48 bg-rose-50 rounded-[3rem] flex items-center justify-center relative animate-float">
-                      <Calendar className="w-20 h-20 text-rose-500" />
-                      {partner.challenge.missions.length > 0 && (
-                        <div className="absolute -top-4 -right-4 bg-indigo-600 text-white w-14 h-14 rounded-full flex flex-col items-center justify-center font-black shadow-xl">
-                          <span className="text-[10px] uppercase leading-none">Dia</span>
-                          <span className="text-xl">{partner.challenge.missions.filter(m => m.completed).length}</span>
-                        </div>
-                      )}
-                    </div>
+                  <h2 className="text-4xl md:text-5xl font-black text-rose-950 leading-tight">Pronto para blindar seu amor <span className="text-rose-600 italic">hoje?</span></h2>
+                  <p className="text-slate-500 text-lg max-w-lg font-medium">Pequenos gestos de Amor Sacrificial feitos com intenção transformam o ambiente da sua casa.</p>
+                  <div className="flex flex-wrap gap-4 pt-4">
+                    <button onClick={() => setActiveTab('challenge')} className="px-10 py-5 bg-rose-600 text-white rounded-[2rem] font-black text-lg hover:bg-rose-700 transition-all shadow-2xl shadow-rose-200 flex items-center gap-3">
+                      {partner.challenge.type ? 'Abrir Missão' : 'Iniciar 60 Dias'} <ChevronRight className="w-5 h-5" />
+                    </button>
+                    <button onClick={() => setActiveTab('coach')} className="px-8 py-5 bg-white border border-rose-100 text-rose-900 rounded-[2rem] font-bold text-lg hover:bg-rose-50 transition-all flex items-center gap-3 shadow-sm">
+                      Aconselhamento Pastoral <Compass className="w-5 h-5 text-rose-400" />
+                    </button>
                   </div>
-               </div>
+                </div>
+                <div className="w-full md:w-1/3 flex justify-center">
+                  <div className="w-48 h-48 bg-rose-50 rounded-[3rem] flex items-center justify-center relative animate-float">
+                    <Calendar className="w-20 h-20 text-rose-500" />
+                    {partner.challenge.missions.length > 0 && (
+                      <div className="absolute -top-4 -right-4 bg-indigo-600 text-white w-14 h-14 rounded-full flex flex-col items-center justify-center font-black shadow-xl">
+                        <span className="text-[10px] uppercase leading-none">Dia</span>
+                        <span className="text-xl">{partner.challenge.missions.filter(m => m.completed).length}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </section>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-               <div className="bg-white p-10 rounded-[3.5rem] border border-blue-50/50 shadow-sm flex flex-col justify-center min-h-[160px] hover:shadow-md transition-shadow">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Suas Linguagens Principais</p>
-                  {user.languages.length > 0 ? (
-                    <div className="flex flex-wrap gap-3">
-                      {user.languages.map(l => (
-                        <div key={l} className="px-5 py-2.5 bg-blue-50 text-blue-600 rounded-2xl text-xs font-black border border-blue-100 flex items-center gap-2">
-                           <div className="w-1.5 h-1.5 bg-blue-400 rounded-full" /> {l}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <button onClick={() => setActiveTab('quiz')} className="text-left text-2xl font-black text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-2 group">
-                      Fazer Teste <ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  )}
-               </div>
 
-               <div className="bg-white p-10 rounded-[3.5rem] border border-rose-50/50 shadow-sm flex flex-col justify-center min-h-[160px] hover:shadow-md transition-shadow">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Linguagens de {partner.name}</p>
-                  {partner.languages.length > 0 && user.isLinked ? (
-                    <div className="flex flex-wrap gap-3">
-                      {partner.languages.map(l => (
-                        <div key={l} className="px-5 py-2.5 bg-rose-50 text-rose-600 rounded-2xl text-xs font-black border border-rose-100 flex items-center gap-2">
-                           <div className="w-1.5 h-1.5 bg-rose-400 rounded-full" /> {l}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <button onClick={() => setActiveTab('connection')} className="text-left text-2xl font-black text-rose-600 hover:text-rose-700 transition-colors flex items-center gap-2 group">
-                      Conectar com Parceiro <ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-                    </button>
-                  )}
-               </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="bg-white p-10 rounded-[3.5rem] border border-blue-50/50 shadow-sm flex flex-col justify-center min-h-[160px] hover:shadow-md transition-shadow">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Suas Linguagens Principais</p>
+                {user.languages.length > 0 ? (
+                  <div className="flex flex-wrap gap-3">
+                    {user.languages.map(l => (
+                      <div key={l} className="px-5 py-2.5 bg-blue-50 text-blue-600 rounded-2xl text-xs font-black border border-blue-100 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full" /> {l}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <button onClick={() => setActiveTab('quiz')} className="text-left text-2xl font-black text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-2 group">
+                    Fazer Teste <ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-white p-10 rounded-[3.5rem] border border-rose-50/50 shadow-sm flex flex-col justify-center min-h-[160px] hover:shadow-md transition-shadow">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Linguagens de {partner.name}</p>
+                {partner.languages.length > 0 && user.isLinked ? (
+                  <div className="flex flex-wrap gap-3">
+                    {partner.languages.map(l => (
+                      <div key={l} className="px-5 py-2.5 bg-rose-50 text-rose-600 rounded-2xl text-xs font-black border border-rose-100 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-rose-400 rounded-full" /> {l}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <button onClick={() => setActiveTab('connection')} className="text-left text-2xl font-black text-rose-600 hover:text-rose-700 transition-colors flex items-center gap-2 group">
+                    Conectar com Parceiro <ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -350,7 +435,7 @@ const App: React.FC = () => {
       case 'challenge':
         const challenge = partner.challenge;
         if (!challenge.type) {
-           return (
+          return (
             <div className="max-w-4xl mx-auto py-12 px-4 text-center">
               <div className="glass-card p-12 md:p-20 rounded-[4rem] shadow-xl border border-rose-100">
                 <div className="w-24 h-24 bg-rose-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10"><Calendar className="w-12 h-12 text-rose-600" /></div>
@@ -369,70 +454,70 @@ const App: React.FC = () => {
                 )}
               </div>
             </div>
-           );
+          );
         }
         const currentMission = challenge.missions.find(m => !m.completed);
         return (
           <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in pb-12 relative">
-             {showCelebration && [...Array(15)].map((_, i) => (
-                <div key={i} className="floating-heart text-rose-500 opacity-0" style={{ left: `${Math.random() * 80 + 10}%`, top: '80%', animationDelay: `${Math.random() * 0.8}s`, fontSize: `${Math.random() * 20 + 10}px` }}><Heart className="fill-current" /></div>
-             ))}
-             {currentMission ? (
-               <div className="space-y-6">
-                  {aiInsight && (
-                    <div className={`${aiInsight.success ? 'bg-emerald-600' : 'bg-amber-600'} text-white p-10 rounded-[3.5rem] shadow-2xl flex flex-col md:flex-row items-center gap-8 border-4 border-white animate-in zoom-in duration-300`}>
-                      <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center shrink-0 shadow-lg rotate-6">
-                        {aiInsight.success ? <Trophy className="w-12 h-12 text-emerald-600" /> : <Sparkles className="w-12 h-12 text-amber-600" />}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="text-3xl font-black mb-3">{aiInsight.success ? 'Semente bem plantada!' : 'Quase lá...'}</h4>
-                        <p className="text-white/90 text-lg leading-relaxed font-medium">"{aiInsight.feedback}"</p>
-                      </div>
+            {showCelebration && [...Array(15)].map((_, i) => (
+              <div key={i} className="floating-heart text-rose-500 opacity-0" style={{ left: `${Math.random() * 80 + 10}%`, top: '80%', animationDelay: `${Math.random() * 0.8}s`, fontSize: `${Math.random() * 20 + 10}px` }}><Heart className="fill-current" /></div>
+            ))}
+            {currentMission ? (
+              <div className="space-y-6">
+                {aiInsight && (
+                  <div className={`${aiInsight.success ? 'bg-emerald-600' : 'bg-amber-600'} text-white p-10 rounded-[3.5rem] shadow-2xl flex flex-col md:flex-row items-center gap-8 border-4 border-white animate-in zoom-in duration-300`}>
+                    <div className="w-24 h-24 bg-white rounded-[2rem] flex items-center justify-center shrink-0 shadow-lg rotate-6">
+                      {aiInsight.success ? <Trophy className="w-12 h-12 text-emerald-600" /> : <Sparkles className="w-12 h-12 text-amber-600" />}
                     </div>
-                  )}
-                  
-                  <div className="bg-slate-950 text-white rounded-[3.5rem] p-10 md:p-16 shadow-2xl relative overflow-hidden group">
-                    <div className="relative z-10">
-                      <div className="flex items-center gap-3 mb-10">
-                        <div className="px-5 py-2 bg-white/10 rounded-full text-[11px] font-black uppercase tracking-[0.3em] text-rose-400 backdrop-blur-sm">
-                          Dia {currentMission.day} • {currentMission.languageApplied}
-                          {currentMission.isAlternative && " (Missão Leve)"}
-                        </div>
-                      </div>
-                      <h4 className="text-5xl font-black mb-8 text-white leading-tight tracking-tight">{currentMission.title}</h4>
-                      <p className="text-2xl text-slate-300 leading-relaxed mb-12 font-medium">"{currentMission.description}"</p>
-                      <div className="bg-white/5 border border-white/10 p-6 rounded-2xl mb-12">
-                         <h5 className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Sparkles className="w-3 h-3" /> Sabedoria de Semeadura</h5>
-                         <p className="text-slate-400 text-sm italic font-medium">"{currentMission.rationale}"</p>
-                      </div>
-
-                      {!isReadyForMission && !aiInsight?.success ? (
-                        <div className="mt-12 p-8 bg-white/5 border border-white/10 rounded-[2.5rem] text-center space-y-6">
-                           <p className="text-slate-300 text-lg font-medium">Você se sente bem para realizar esta tarefa específica hoje?</p>
-                           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                              <button onClick={() => setIsReadyForMission(true)} className="px-8 py-4 bg-rose-600 text-white rounded-2xl font-black text-lg hover:bg-rose-700 transition-all shadow-xl">Sim, vou fazer</button>
-                              <button onClick={() => skipMission(currentMission)} className="px-8 py-4 bg-white/10 text-white rounded-2xl font-bold text-lg hover:bg-white/20 transition-all">Não me sinto bem para esta tarefa</button>
-                           </div>
-                        </div>
-                      ) : !aiInsight?.success && (
-                        <div className="space-y-6 animate-in fade-in slide-in-from-top-4">
-                          <textarea value={fulfillmentText} onChange={(e) => setFulfillmentText(e.target.value)} placeholder="Como foi semear amor desta forma hoje?" className="w-full bg-white/5 border border-white/10 rounded-[2rem] p-8 text-white text-xl focus:outline-none focus:border-rose-500 transition-all h-48 font-medium" />
-                          <div className="flex flex-col sm:flex-row gap-4">
-                            <button onClick={() => completeMission(currentMission)} disabled={loadingMission || !fulfillmentText.trim()} className="flex-1 py-6 bg-rose-600 text-white rounded-[2.5rem] font-black text-xl hover:bg-rose-700 transition-all flex items-center justify-center gap-4 shadow-2xl">
-                              {loadingMission ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin" /> : "Validar Missão"}
-                            </button>
-                            <button onClick={() => { setIsReadyForMission(false); setFulfillmentText(''); }} className="px-8 py-6 bg-white/10 text-white rounded-[2.5rem] font-bold text-lg hover:bg-white/20 transition-all">Voltar</button>
-                          </div>
-                        </div>
-                      )}
+                    <div className="flex-1">
+                      <h4 className="text-3xl font-black mb-3">{aiInsight.success ? 'Semente bem plantada!' : 'Quase lá...'}</h4>
+                      <p className="text-white/90 text-lg leading-relaxed font-medium">"{aiInsight.feedback}"</p>
                     </div>
                   </div>
-               </div>
-             ) : null}
+                )}
+
+                <div className="bg-slate-950 text-white rounded-[3.5rem] p-10 md:p-16 shadow-2xl relative overflow-hidden group">
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-3 mb-10">
+                      <div className="px-5 py-2 bg-white/10 rounded-full text-[11px] font-black uppercase tracking-[0.3em] text-rose-400 backdrop-blur-sm">
+                        Dia {currentMission.day} • {currentMission.languageApplied}
+                        {currentMission.isAlternative && " (Missão Leve)"}
+                      </div>
+                    </div>
+                    <h4 className="text-5xl font-black mb-8 text-white leading-tight tracking-tight">{currentMission.title}</h4>
+                    <p className="text-2xl text-slate-300 leading-relaxed mb-12 font-medium">"{currentMission.description}"</p>
+                    <div className="bg-white/5 border border-white/10 p-6 rounded-2xl mb-12">
+                      <h5 className="text-[10px] font-black text-rose-400 uppercase tracking-widest mb-2 flex items-center gap-2"><Sparkles className="w-3 h-3" /> Sabedoria de Semeadura</h5>
+                      <p className="text-slate-400 text-sm italic font-medium">"{currentMission.rationale}"</p>
+                    </div>
+
+                    {!isReadyForMission && !aiInsight?.success ? (
+                      <div className="mt-12 p-8 bg-white/5 border border-white/10 rounded-[2.5rem] text-center space-y-6">
+                        <p className="text-slate-300 text-lg font-medium">Você se sente bem para realizar esta tarefa específica hoje?</p>
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                          <button onClick={() => setIsReadyForMission(true)} className="px-8 py-4 bg-rose-600 text-white rounded-2xl font-black text-lg hover:bg-rose-700 transition-all shadow-xl">Sim, vou fazer</button>
+                          <button onClick={() => skipMission(currentMission)} className="px-8 py-4 bg-white/10 text-white rounded-2xl font-bold text-lg hover:bg-white/20 transition-all">Não me sinto bem para esta tarefa</button>
+                        </div>
+                      </div>
+                    ) : !aiInsight?.success && (
+                      <div className="space-y-6 animate-in fade-in slide-in-from-top-4">
+                        <textarea value={fulfillmentText} onChange={(e) => setFulfillmentText(e.target.value)} placeholder="Como foi semear amor desta forma hoje?" className="w-full bg-white/5 border border-white/10 rounded-[2rem] p-8 text-white text-xl focus:outline-none focus:border-rose-500 transition-all h-48 font-medium" />
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          <button onClick={() => completeMission(currentMission)} disabled={loadingMission || !fulfillmentText.trim()} className="flex-1 py-6 bg-rose-600 text-white rounded-[2.5rem] font-black text-xl hover:bg-rose-700 transition-all flex items-center justify-center gap-4 shadow-2xl">
+                            {loadingMission ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin" /> : "Validar Missão"}
+                          </button>
+                          <button onClick={() => { setIsReadyForMission(false); setFulfillmentText(''); }} className="px-8 py-6 bg-white/10 text-white rounded-[2.5rem] font-bold text-lg hover:bg-white/20 transition-all">Voltar</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
         );
       case 'coach': return <PersonalCoach />;
-      case 'gratitude': return <GratitudeJournal entries={user.gratitudeJournal || []} onAddEntry={(e) => setUser(p => ({...p, gratitudeJournal: [...p.gratitudeJournal, {...e, id: Math.random().toString(), date: new Date().toISOString()}]}))} onDeleteEntry={(id) => setUser(p => ({...p, gratitudeJournal: p.gratitudeJournal.filter(x => x.id !== id)}))} />;
+      case 'gratitude': return <GratitudeJournal entries={user.gratitudeJournal || []} onAddEntry={(e) => setUser(p => ({ ...p, gratitudeJournal: [...p.gratitudeJournal, { ...e, id: Math.random().toString(), date: new Date().toISOString() }] }))} onDeleteEntry={(id) => setUser(p => ({ ...p, gratitudeJournal: p.gratitudeJournal.filter(x => x.id !== id) }))} />;
       case 'myChallenges': return <MyChallenges challenge={partner.challenge} partnerName={partner.name} onRedoMission={handleRedoMission} onGoToChallenge={() => setActiveTab('challenge')} />;
       case 'connection': return <CoupleConnection userCode={user.coupleCode || 'ABCD-123'} onLink={handleLinkPartner} linkedPartner={user.isLinked ? partner.name : undefined} />;
       default: return null;
@@ -468,25 +553,25 @@ const App: React.FC = () => {
             ))}
           </nav>
           <div className="flex items-center gap-3">
-             <div className="hidden md:block">
-                <NotificationManager 
-                  user={user} 
-                  partner={partner} 
-                  onToggleNotifications={(e) => setUser(p => ({ ...p, notificationsEnabled: e }))} 
-                  onToggleSound={(e) => setUser(p => ({ ...p, soundEnabled: e }))} 
-                  onTestNotification={() => sendNotification("Teste de Lembrete", "Seu sistema de lembretes está funcionando perfeitamente! ❤️")}
-                />
-             </div>
-             <button onClick={() => setActiveTab('connection')} className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${user.isLinked ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse'}`}>
-                {user.isLinked ? <Link2 size={20} /> : <UserPlus size={20} />}
-             </button>
-             <button 
-                onClick={handleLogout}
-                className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-50 text-slate-400 border border-slate-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-all"
-                title="Sair"
-             >
-                <LogOut size={20} />
-             </button>
+            <div className="hidden md:block">
+              <NotificationManager
+                user={user}
+                partner={partner}
+                onToggleNotifications={(e) => setUser(p => ({ ...p, notificationsEnabled: e }))}
+                onToggleSound={(e) => setUser(p => ({ ...p, soundEnabled: e }))}
+                onTestNotification={() => sendNotification("Teste de Lembrete", "Seu sistema de lembretes está funcionando perfeitamente! ❤️")}
+              />
+            </div>
+            <button onClick={() => setActiveTab('connection')} className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${user.isLinked ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100 animate-pulse'}`}>
+              {user.isLinked ? <Link2 size={20} /> : <UserPlus size={20} />}
+            </button>
+            <button
+              onClick={handleLogout}
+              className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-50 text-slate-400 border border-slate-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 transition-all"
+              title="Sair"
+            >
+              <LogOut size={20} />
+            </button>
           </div>
         </div>
       </header>
