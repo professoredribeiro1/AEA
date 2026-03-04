@@ -1,12 +1,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { LoveLanguage, Mission } from "../types";
 
-// Pegar a chave de qualquer lugar disponível (VITE_ ou process.env injetado pelo Vite)
-const GEMINI_API_KEY = (import.meta.env.VITE_GEMINI_API_KEY as string) ||
-  (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : '') ||
-  '';
-
-const genAI = new GoogleGenAI(GEMINI_API_KEY);
+// Função auxiliar para obter a instância da IA com segurança
+const getGenAI = () => {
+  const GEMINI_API_KEY = (import.meta.env.VITE_GEMINI_API_KEY as string) ||
+    (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : '') ||
+    '';
+  if (!GEMINI_API_KEY) {
+    console.error("ERRO CRÍTICO: Chave da IA não encontrada. O Conselheiro e Missões não funcionarão.");
+  }
+  return new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+};
 
 export const generateDailyMission = async (
   targetLanguage: LoveLanguage,
@@ -25,6 +29,7 @@ export const generateDailyMission = async (
   const currentTheme = themes[(cycleNumber - 1) % themes.length];
 
   try {
+    const genAI = getGenAI();
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
       systemInstruction: `Você é um mentor de relacionamentos especialista no método de Gary Chapman.
@@ -85,7 +90,7 @@ export const getMissionCompletionFeedback = async (
   userRelato: string
 ): Promise<{ feedback: string, impact: number, success: boolean }> => {
   try {
-    const model = genAI.getGenerativeModel({
+    const model = getGenAI().getGenerativeModel({
       model: "gemini-1.5-flash",
       systemInstruction: `Analise o relato de cumprimento.
       - Valorize a consistência e a intenção, não a grandiosidade.
@@ -130,7 +135,7 @@ export const getMissionCompletionFeedback = async (
 
 export const getCoachAdvice = async (history: { role: string, parts: { text: string }[] }[], userMessage: string): Promise<string> => {
   try {
-    const model = genAI.getGenerativeModel({
+    const model = getGenAI().getGenerativeModel({
       model: "gemini-1.5-flash",
       systemInstruction: `Você é o "Conselheiro Pastoral" de felicidade conjugal.
       PERSONA:
