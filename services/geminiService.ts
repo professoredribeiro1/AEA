@@ -2,7 +2,9 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { LoveLanguage, Mission } from "../types";
 
 // Pegar a chave de qualquer lugar disponível (VITE_ ou process.env injetado pelo Vite)
-const GEMINI_API_KEY = (import.meta.env.VITE_GEMINI_API_KEY as string) || (process.env.GEMINI_API_KEY as string);
+const GEMINI_API_KEY = (import.meta.env.VITE_GEMINI_API_KEY as string) ||
+  (typeof process !== 'undefined' ? process.env?.GEMINI_API_KEY : '') ||
+  '';
 
 const genAI = new GoogleGenAI(GEMINI_API_KEY);
 
