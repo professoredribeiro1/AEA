@@ -21,7 +21,7 @@ export const generateDailyMission = async (
   const currentTheme = themes[(cycleNumber - 1) % themes.length];
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-1.5-flash',
     contents: `Gere uma missão prática de "Amor Sacrificial" ${isLighter ? 'LEVE E SUAVE ' : ''}para o dia ${dayNumber} do Ciclo ${cycleNumber} (Tema: ${currentTheme}). O alvo é "${targetName}" e sua linguagem do amor predominante é "${targetLanguage}".`,
     config: {
       systemInstruction: `Você é um mentor de relacionamentos especialista no método de Gary Chapman.
@@ -65,7 +65,7 @@ export const getMissionCompletionFeedback = async (
   userRelato: string
 ): Promise<{ feedback: string, impact: number, success: boolean }> => {
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-1.5-flash',
     contents: `Missão: "${mission.title}". 
     O que foi pedido: "${mission.description}".
     Relato do usuário: "${userRelato}". 
@@ -94,7 +94,7 @@ export const getMissionCompletionFeedback = async (
 
 export const getCoachAdvice = async (history: { role: string, parts: { text: string }[] }[], userMessage: string): Promise<string> => {
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-1.5-flash',
     contents: [...history, { role: 'user', parts: [{ text: userMessage }] }],
     config: {
       systemInstruction: `Você é o "Conselheiro Pastoral" de felicidade conjugal.
