@@ -20,6 +20,7 @@ export const generateDailyMission = async (
   ];
   const currentTheme = themes[(cycleNumber - 1) % themes.length];
 
+  console.log('Generating mission with model: gemini-1.5-flash-latest');
   const response = await ai.models.generateContent({
     model: 'gemini-1.5-flash-latest',
     contents: `Gere uma missão prática de "Amor Sacrificial" ${isLighter ? 'LEVE E SUAVE ' : ''}para o dia ${dayNumber} do Ciclo ${cycleNumber} (Tema: ${currentTheme}). O alvo é "${targetName}" e sua linguagem do amor predominante é "${targetLanguage}".`,
