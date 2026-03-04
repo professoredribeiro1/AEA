@@ -17,7 +17,8 @@ export const generateDailyMission = async (
   targetName: string,
   dayNumber: number,
   cycleNumber: number = 1,
-  isLighter: boolean = false
+  isLighter: boolean = false,
+  avoidContent?: string
 ): Promise<Partial<Mission>> => {
   const themes = [
     "Fundação e Reconexão Básica",
@@ -54,7 +55,7 @@ export const generateDailyMission = async (
     });
 
     const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: `Gere uma missão prática de "Amor Sacrificial" ${isLighter ? 'LEVE E SUAVE ' : ''}para o dia ${dayNumber} do Ciclo ${cycleNumber} (Tema: ${currentTheme}). O alvo é "${targetName}" e sua linguagem do amor predominante é "${targetLanguage}".` }] }],
+      contents: [{ role: "user", parts: [{ text: `Gere uma missão prática de "Amor Sacrificial" ${isLighter ? 'LEVE E SUAVE ' : ''}para o dia ${dayNumber} do Ciclo ${cycleNumber} (Tema: ${currentTheme}). O alvo é "${targetName}" e sua linguagem do amor predominante é "${targetLanguage}". ${avoidContent ? `O usuário acaba de recusar a seguinte missão por se sentir mal em realizá-la agora: "${avoidContent}". NÃO REPITA ESTE TEMA OU AÇÃO. Sugira algo totalmente diferente.` : ''}` }] }],
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {

@@ -216,7 +216,7 @@ const App: React.FC = () => {
     try {
       const targetLang = mission.languageApplied || partner.languages[0];
       const currentCycle = partner.challenge.cycleCount || 1;
-      const lighterData = await generateDailyMission(targetLang, partner.name, mission.day, currentCycle, true);
+      const lighterData = await generateDailyMission(targetLang, partner.name, mission.day, currentCycle, true, mission.description);
 
       const lighterMission: Mission = {
         id: Math.random().toString(36).substr(2, 9),
