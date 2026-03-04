@@ -57,6 +57,7 @@ const App: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'quiz' | 'challenge' | 'myChallenges' | 'coach' | 'connection' | 'gratitude'>('dashboard');
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingMission, setLoadingMission] = useState(false);
   const [aiInsight, setAiInsight] = useState<{ feedback: string; success: boolean; impact?: number } | null>(null);
   const [fulfillmentText, setFulfillmentText] = useState('');
@@ -75,6 +76,8 @@ const App: React.FC = () => {
       if (session?.user) {
         setSupabaseUserId(session.user.id);
         fetchUserProfile(session.user.id);
+      } else {
+        setLoadingProfile(false);
       }
       setSessionLoading(false);
     });
@@ -88,6 +91,7 @@ const App: React.FC = () => {
         fetchUserProfile(session.user.id);
       } else {
         setSupabaseUserId(null);
+        setLoadingProfile(false);
       }
     });
 
@@ -134,6 +138,8 @@ const App: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
@@ -148,7 +154,11 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    localStorage.removeItem('love_user_v4');
+    localStorage.removeItem('love_partner_v4');
+    localStorage.removeItem('coach_history');
     setIsAuthenticated(false);
+    setLoadingProfile(false);
     setActiveTab('dashboard');
   };
 
@@ -347,10 +357,13 @@ const App: React.FC = () => {
     }
   };
 
-  if (sessionLoading) {
+  if (sessionLoading || (isAuthenticated && loadingProfile)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="w-12 h-12 border-4 border-rose-200 border-t-rose-600 rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-rose-200 border-t-rose-600 rounded-full animate-spin" />
+          <p className="text-rose-900 font-bold animate-pulse italic">Alinhando seu Amor...</p>
+        </div>
       </div>
     );
   }

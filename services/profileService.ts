@@ -61,21 +61,17 @@ export const fetchPartnerProfile = async (partnerId: string): Promise<SupabasePr
  * Retorna o perfil do parceiro se encontrado, ou null.
  */
 export const linkWithPartner = async (myUserId: string, partnerCode: string): Promise<SupabaseProfile | null> => {
-    // Busca o parceiro pelo código
-    const { data: partnerData, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, tank_level, languages, couple_code, partner_id, challenge')
-        .eq('couple_code', partnerCode.toUpperCase().trim())
-        .single();
+    const { data, error } = await supabase.rpc('link_partners', {
+        my_user_id: myUserId,
+        p_code: partnerCode.toUpperCase().trim()
+    });
 
-    if (error || !partnerData) return null;
-    if (partnerData.id === myUserId) return null; // Não pode linkar consigo mesmo
+    if (error || !data || !data.success) {
+        console.error('Erro ao vincular parceiro:', error || data?.error);
+        return null;
+    }
 
-    // Salva o partner_id em ambos os perfis
-    await supabase.from('profiles').update({ partner_id: partnerData.id }).eq('id', myUserId);
-    await supabase.from('profiles').update({ partner_id: myUserId }).eq('id', partnerData.id);
-
-    return partnerData as SupabaseProfile;
+    return data.partner as SupabaseProfile;
 };
 
 /**

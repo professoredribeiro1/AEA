@@ -50,7 +50,7 @@ export interface Challenge {
 }
 
 export interface SubscriptionInfo {
-  status: 'trial' | 'active' | 'expired';
+  status: 'trial' | 'trialing' | 'active' | 'expired';
   plan: 'monthly' | 'quarterly' | 'semiannual' | 'annual' | 'couple' | 'none';
   trialStartedAt: string;
   expiresAt: string | null;
