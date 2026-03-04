@@ -186,28 +186,34 @@ const App: React.FC = () => {
     if (confirm("Deseja iniciar um novo ciclo de 60 dias de semeadura?")) {
       setLoadingMission(true);
       setIsReadyForMission(false);
-      const cycle = (partner.challenge.cycleCount || 1) + 1;
-      const targetLang = partner.languages[0];
-      const d = await generateDailyMission(targetLang, partner.name, 1, cycle);
-      const newChallenge: Challenge = {
-        ...emptyChallenge,
-        type: 60,
-        cycleCount: cycle,
-        startDate: new Date().toISOString(),
-        missions: [{
-          id: Math.random().toString(36).substr(2, 9),
-          day: 1,
-          title: d.title!,
-          description: d.description!,
-          rationale: d.rationale!,
-          completed: false,
-          languageApplied: targetLang
-        }]
-      };
-      setPartner(p => ({ ...p, challenge: newChallenge }));
-      if (supabaseUserId) updateChallenge(supabaseUserId, newChallenge);
-      setLoadingMission(false);
-      setActiveTab('challenge');
+      if (partner.languages.length >= 2 && user.isLinked) {
+        const cycle = (partner.challenge.cycleCount || 1) + 1;
+        const targetLang = partner.languages[0];
+        const d = await generateDailyMission(targetLang, partner.name, 1, cycle);
+        const newChallenge: Challenge = {
+          ...emptyChallenge,
+          type: 60,
+          cycleCount: cycle,
+          startDate: new Date().toISOString(),
+          missions: [{
+            id: Math.random().toString(36).substr(2, 9),
+            day: 1,
+            title: d.title!,
+            description: d.description!,
+            rationale: d.rationale!,
+            completed: false,
+            languageApplied: targetLang
+          }]
+        };
+        setPartner(p => ({ ...p, challenge: newChallenge }));
+        if (supabaseUserId) updateChallenge(supabaseUserId, newChallenge);
+        setLoadingMission(false);
+        setActiveTab('challenge');
+      } else {
+        setLoadingMission(false);
+        alert("Conecte-se com seu parceiro para que possamos usar as linguagens de amor dele(a) nas missões.");
+        setActiveTab('connection');
+      }
     }
   };
 
@@ -272,7 +278,8 @@ const App: React.FC = () => {
         const currentCycle = partner.challenge.cycleCount || 1;
 
         if (nextDay <= (partner.challenge.type || 0)) {
-          const targetLang = nextDay % 2 !== 0 ? partner.languages[0] : partner.languages[1];
+          // Alterna estritamente entre as 2 linguagens principais do parceiro
+          const targetLang = nextDay % 2 !== 0 ? partner.languages[0] : (partner.languages[1] || partner.languages[0]);
           const nextData = await generateDailyMission(targetLang, partner.name, nextDay, currentCycle);
           updatedMissions.push({
             id: Math.random().toString(36).substr(2, 9),
@@ -425,7 +432,16 @@ const App: React.FC = () => {
                   <h2 className="text-4xl md:text-5xl font-black text-rose-950 leading-tight">Pronto para blindar seu amor <span className="text-rose-600 italic">hoje?</span></h2>
                   <p className="text-slate-500 text-lg max-w-lg font-medium">Pequenos gestos de Amor Sacrificial feitos com intenção transformam o ambiente da sua casa.</p>
                   <div className="flex flex-wrap gap-4 pt-4">
-                    <button onClick={() => setActiveTab('challenge')} className="px-10 py-5 bg-rose-600 text-white rounded-[2rem] font-black text-lg hover:bg-rose-700 transition-all shadow-2xl shadow-rose-200 flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        if (user.isLinked) {
+                          setActiveTab('challenge');
+                        } else {
+                          setActiveTab('connection');
+                        }
+                      }}
+                      className="px-10 py-5 bg-rose-600 text-white rounded-[2rem] font-black text-lg hover:bg-rose-700 transition-all shadow-2xl shadow-rose-200 flex items-center gap-3"
+                    >
                       {partner.challenge.type ? 'Abrir Missão' : 'Iniciar 60 Dias'} <ChevronRight className="w-5 h-5" />
                     </button>
                     <button onClick={() => setActiveTab('coach')} className="px-8 py-5 bg-white border border-rose-100 text-rose-900 rounded-[2rem] font-bold text-lg hover:bg-rose-50 transition-all flex items-center gap-3 shadow-sm">
@@ -499,7 +515,7 @@ const App: React.FC = () => {
                 <div className="w-24 h-24 bg-rose-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10"><Calendar className="w-12 h-12 text-rose-600" /></div>
                 <h2 className="text-5xl font-black text-rose-950 mb-8 tracking-tight">Comece a Semear</h2>
                 <p className="text-slate-500 text-xl mb-12 max-w-2xl mx-auto font-medium">60 dias de Amor Sacrificial transformarão seu casamento em algo duradouro e prazeroso.</p>
-                {partner.languages.length >= 2 ? (
+                {partner.languages.length >= 2 && user.isLinked ? (
                   <button onClick={async () => {
                     setLoadingMission(true);
                     const targetLang = partner.languages[0];
@@ -514,7 +530,10 @@ const App: React.FC = () => {
                   </button>
                 ) : (
                   <div className="space-y-6 flex flex-col items-center">
-                    <p className="text-rose-600 font-bold bg-rose-50 px-6 py-3 rounded-2xl border border-rose-100">Conecte-se antes de começar o desafio.</p>
+                    <p className="text-rose-600 font-bold bg-rose-50 px-6 py-3 rounded-2xl border border-rose-100 italic">
+                      "Para semear no coração de quem você ama, primeiro precisamos saber o que ele(a) valoriza."
+                    </p>
+                    <p className="text-slate-400 text-sm max-w-md">Conecte-se com seu parceiro para liberar as missões baseadas nas linguagens de amor reais dele(a).</p>
                     <button onClick={() => setActiveTab('connection')} className="w-full max-w-md bg-slate-900 p-8 rounded-[2.5rem] hover:bg-black transition-all text-white font-black text-2xl uppercase tracking-tighter flex items-center justify-center gap-4 shadow-2xl">Conectar Agora <UserPlus className="w-6 h-6" /></button>
                   </div>
                 )}
