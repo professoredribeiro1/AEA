@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LoveLanguage, UserProfile, Challenge, Mission, SubscriptionInfo, Message, TankTheme, GratitudeEntry } from './types';
+import { fetchMyProfile, fetchPartnerProfile, linkWithPartner, updateTankLevel, updateLanguages, updateChallenge, ensureCoupleCode } from './services/profileService';
 import { LANGUAGE_METADATA } from './constants.tsx';
 import TankGauge from './components/TankGauge';
 import Quiz from './components/Quiz';
@@ -19,6 +20,7 @@ import {
 } from 'lucide-react';
 
 const App: React.FC = () => {
+  const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
   const emptyChallenge: Challenge = { type: null, startDate: null, missions: [], cycleCount: 1 };
 
   const getInitialSubscription = (): SubscriptionInfo => {
@@ -71,7 +73,7 @@ const App: React.FC = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsAuthenticated(!!session);
       if (session?.user) {
-        setUser(prev => ({ ...prev, name: session.user.user_metadata.full_name || 'Usuário' }));
+        setSupabaseUserId(session.user.id);
         fetchUserProfile(session.user.id);
       }
       setSessionLoading(false);
@@ -82,8 +84,10 @@ const App: React.FC = () => {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(!!session);
       if (session?.user) {
-        setUser(prev => ({ ...prev, name: session.user.user_metadata.full_name || 'Usuário' }));
+        setSupabaseUserId(session.user.id);
         fetchUserProfile(session.user.id);
+      } else {
+        setSupabaseUserId(null);
       }
     });
 
@@ -92,31 +96,48 @@ const App: React.FC = () => {
 
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('subscription_status, plan_type, expires_at')
-        .eq('id', userId)
-        .single();
+      // Garantir que o couple_code existe
+      const code = await ensureCoupleCode(userId);
 
-      if (error) {
-        // Ignora erro se não encontrou (pode estar criando o trigger)
-        console.error("Erro ao buscar perfil:", error);
-      } else if (data) {
+      const profile = await fetchMyProfile(userId);
+      if (profile) {
         setUser(prev => ({
           ...prev,
+          name: profile.full_name || prev.name || 'Usuário',
+          tankLevel: profile.tank_level ?? prev.tankLevel,
+          languages: (profile.languages?.length > 0) ? profile.languages : prev.languages,
+          challenge: profile.challenge || prev.challenge,
+          coupleCode: profile.couple_code || code,
+          isLinked: !!profile.partner_id,
           subscription: {
-            status: (data.subscription_status === 'trialing' || data.subscription_status === 'active') ? data.subscription_status : 'expired',
-            plan: data.plan_type as any,
+            status: (profile.subscription_status === 'trialing' || profile.subscription_status === 'active') ? profile.subscription_status as any : 'trial',
+            plan: (profile.plan_type as any) || 'none',
             trialStartedAt: prev.subscription.trialStartedAt,
-            expiresAt: data.expires_at
+            expiresAt: profile.expires_at
           }
         }));
+
+        // Se tiver parceiro vinculado, carrega o perfil dele
+        if (profile.partner_id) {
+          const partnerProfile = await fetchPartnerProfile(profile.partner_id);
+          if (partnerProfile) {
+            setPartner(prev => ({
+              ...prev,
+              name: partnerProfile.full_name || 'Parceiro(a)',
+              tankLevel: partnerProfile.tank_level ?? 5,
+              languages: partnerProfile.languages || [],
+              challenge: partnerProfile.challenge || prev.challenge,
+              isLinked: true
+            }));
+          }
+        }
       }
     } catch (err) {
       console.error(err);
     }
   };
 
+  // Mantém localStorage para backup offline
   useEffect(() => { if (!sessionLoading) localStorage.setItem('love_user_v4', JSON.stringify(user)); }, [user, sessionLoading]);
   useEffect(() => { if (!sessionLoading) localStorage.setItem('love_partner_v4', JSON.stringify(partner)); }, [partner, sessionLoading]);
 
@@ -140,10 +161,12 @@ const App: React.FC = () => {
       const updatedMissions = partner.challenge.missions.map(m =>
         m.id === id ? { ...m, completed: false, aiFeedback: undefined } : m
       );
+      const newChallenge = { ...partner.challenge, missions: updatedMissions };
       setPartner(prev => ({
         ...prev,
-        challenge: { ...prev.challenge, missions: updatedMissions }
+        challenge: newChallenge
       }));
+      if (supabaseUserId) updateChallenge(supabaseUserId, newChallenge);
       setIsReadyForMission(true);
       setActiveTab('challenge');
     }
@@ -156,24 +179,23 @@ const App: React.FC = () => {
       const cycle = (partner.challenge.cycleCount || 1) + 1;
       const targetLang = partner.languages[0];
       const d = await generateDailyMission(targetLang, partner.name, 1, cycle);
-      setPartner(p => ({
-        ...p,
-        challenge: {
-          ...emptyChallenge,
-          type: 60,
-          cycleCount: cycle,
-          startDate: new Date().toISOString(),
-          missions: [{
-            id: Math.random().toString(36).substr(2, 9),
-            day: 1,
-            title: d.title!,
-            description: d.description!,
-            rationale: d.rationale!,
-            completed: false,
-            languageApplied: targetLang
-          }]
-        }
-      }));
+      const newChallenge: Challenge = {
+        ...emptyChallenge,
+        type: 60,
+        cycleCount: cycle,
+        startDate: new Date().toISOString(),
+        missions: [{
+          id: Math.random().toString(36).substr(2, 9),
+          day: 1,
+          title: d.title!,
+          description: d.description!,
+          rationale: d.rationale!,
+          completed: false,
+          languageApplied: targetLang
+        }]
+      };
+      setPartner(p => ({ ...p, challenge: newChallenge }));
+      if (supabaseUserId) updateChallenge(supabaseUserId, newChallenge);
       setLoadingMission(false);
       setActiveTab('challenge');
     }
@@ -203,10 +225,12 @@ const App: React.FC = () => {
         m.id === mission.id ? lighterMission : m
       );
 
+      const newChallenge = { ...partner.challenge, missions: updatedMissions };
       setPartner(prev => ({
         ...prev,
-        challenge: { ...prev.challenge, missions: updatedMissions }
+        challenge: newChallenge
       }));
+      if (supabaseUserId) updateChallenge(supabaseUserId, newChallenge);
       setIsReadyForMission(false); // Volta para o estado de visualização para a nova missão
 
       const skipMessage = mission.isAlternative
@@ -276,11 +300,16 @@ const App: React.FC = () => {
             return;
           }
         }
+        const newChallenge = { ...partner.challenge, missions: updatedMissions };
         setPartner(prev => ({
           ...prev,
           tankLevel: Math.min(10, parseFloat((prev.tankLevel + (impact || 0)).toFixed(1))),
-          challenge: { ...prev.challenge, missions: updatedMissions }
+          challenge: newChallenge
         }));
+        if (supabaseUserId) {
+          updateChallenge(supabaseUserId, newChallenge);
+          updateTankLevel(supabaseUserId, Math.min(10, parseFloat((user.tankLevel + (impact || 0)).toFixed(1))));
+        }
         setFulfillmentText('');
       }
       setAiInsight({ feedback, success, impact });
@@ -292,13 +321,29 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLinkPartner = (partnerCode: string) => {
-    if (partnerCode.trim().length >= 4) {
-      const simulatedPartnerLangs = [LoveLanguage.TIME, LoveLanguage.WORDS];
-      setUser(prev => ({ ...prev, isLinked: true, linkedPartnerName: 'Parceiro(a)' }));
-      setPartner(prev => ({ ...prev, isLinked: true, languages: simulatedPartnerLangs }));
-      alert("Conexão estabelecida com sucesso! Linguagens sincronizadas.");
+  const handleLinkPartner = async (partnerCode: string) => {
+    if (!supabaseUserId) { alert("Você precisa estar logado para conectar."); return; }
+    if (partnerCode.trim().length < 4) return;
+    try {
+      const partnerProfile = await linkWithPartner(supabaseUserId, partnerCode);
+      if (!partnerProfile) {
+        alert("Código não encontrado. Verifique o código e tente novamente.");
+        return;
+      }
+      setUser(prev => ({ ...prev, isLinked: true, linkedPartnerName: partnerProfile.full_name || 'Parceiro(a)' }));
+      setPartner(prev => ({
+        ...prev,
+        name: partnerProfile.full_name || 'Parceiro(a)',
+        tankLevel: partnerProfile.tank_level ?? 5,
+        languages: partnerProfile.languages || [],
+        challenge: partnerProfile.challenge || prev.challenge,
+        isLinked: true
+      }));
+      alert("Conexão estabelecida com sucesso! Você está conectado(a) com " + (partnerProfile.full_name || 'seu(sua) parceiro(a)') + ".");
       setActiveTab('dashboard');
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao conectar. Tente novamente.");
     }
   };
 
@@ -426,12 +471,12 @@ const App: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              <TankGauge label="Termômetro Diário" type="self" level={user.tankLevel} onUpdate={(v) => setUser(p => ({ ...p, tankLevel: v }))} theme={user.tankTheme || TankTheme.MODERN} onThemeChange={(t) => setUser(p => ({ ...p, tankTheme: t }))} />
-              <TankGauge label="Termômetro do Parceiro" type="partner" level={partner.tankLevel} onUpdate={(v) => setPartner(p => ({ ...p, tankLevel: v }))} theme={user.tankTheme || TankTheme.MODERN} onThemeChange={(t) => setUser(p => ({ ...p, tankTheme: t }))} />
+              <TankGauge label="Termômetro Diário" type="self" level={user.tankLevel} onUpdate={(v) => { setUser(p => ({ ...p, tankLevel: v })); if (supabaseUserId) updateTankLevel(supabaseUserId, v); }} theme={user.tankTheme || TankTheme.MODERN} onThemeChange={(t) => setUser(p => ({ ...p, tankTheme: t }))} />
+              <TankGauge label="Termômetro do Parceiro" type="partner" level={partner.tankLevel} onUpdate={() => { }} theme={user.tankTheme || TankTheme.MODERN} onThemeChange={(t) => setUser(p => ({ ...p, tankTheme: t }))} />
             </div>
           </div>
         );
-      case 'quiz': return <Quiz onComplete={(res) => { setUser(prev => ({ ...prev, languages: res })); setActiveTab('dashboard'); }} />;
+      case 'quiz': return <Quiz onComplete={(res) => { setUser(prev => ({ ...prev, languages: res })); setActiveTab('dashboard'); if (supabaseUserId) updateLanguages(supabaseUserId, res); }} />;
       case 'challenge':
         const challenge = partner.challenge;
         if (!challenge.type) {
@@ -442,7 +487,15 @@ const App: React.FC = () => {
                 <h2 className="text-5xl font-black text-rose-950 mb-8 tracking-tight">Comece a Semear</h2>
                 <p className="text-slate-500 text-xl mb-12 max-w-2xl mx-auto font-medium">60 dias de Amor Sacrificial transformarão seu casamento em algo duradouro e prazeroso.</p>
                 {partner.languages.length >= 2 ? (
-                  <button onClick={async () => { setLoadingMission(true); const targetLang = partner.languages[0]; const d = await generateDailyMission(targetLang, partner.name, 1); setPartner(p => ({ ...p, challenge: { type: 60, startDate: new Date().toISOString(), cycleCount: 1, missions: [{ id: Math.random().toString(36).substr(2, 9), day: 1, title: d.title!, description: d.description!, rationale: d.rationale!, completed: false, languageApplied: targetLang }] } })); setLoadingMission(false); }} className="w-full max-w-md bg-rose-600 p-8 rounded-[2.5rem] hover:bg-rose-700 transition-all text-white group shadow-2xl">
+                  <button onClick={async () => {
+                    setLoadingMission(true);
+                    const targetLang = partner.languages[0];
+                    const d = await generateDailyMission(targetLang, partner.name, 1);
+                    const newChallenge: Challenge = { type: 60, startDate: new Date().toISOString(), cycleCount: 1, missions: [{ id: Math.random().toString(36).substr(2, 9), day: 1, title: d.title!, description: d.description!, rationale: d.rationale!, completed: false, languageApplied: targetLang }] };
+                    setPartner(p => ({ ...p, challenge: newChallenge }));
+                    if (supabaseUserId) updateChallenge(supabaseUserId, newChallenge);
+                    setLoadingMission(false);
+                  }} className="w-full max-w-md bg-rose-600 p-8 rounded-[2.5rem] hover:bg-rose-700 transition-all text-white group shadow-2xl">
                     <span className="block font-black text-3xl mb-1 uppercase tracking-tighter">Ativar Desafio</span>
                     <span className="text-rose-100 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"><Sparkles className="w-3 h-3" /> Receber Primeira Missão</span>
                   </button>

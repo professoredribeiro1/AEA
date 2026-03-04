@@ -2,12 +2,12 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { LoveLanguage, Mission } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 export const generateDailyMission = async (
-  targetLanguage: LoveLanguage, 
-  targetName: string, 
-  dayNumber: number, 
+  targetLanguage: LoveLanguage,
+  targetName: string,
+  dayNumber: number,
   cycleNumber: number = 1,
   isLighter: boolean = false
 ): Promise<Partial<Mission>> => {
@@ -21,7 +21,7 @@ export const generateDailyMission = async (
   const currentTheme = themes[(cycleNumber - 1) % themes.length];
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.0-flash',
     contents: `Gere uma missão prática de "Amor Sacrificial" ${isLighter ? 'LEVE E SUAVE ' : ''}para o dia ${dayNumber} do Ciclo ${cycleNumber} (Tema: ${currentTheme}). O alvo é "${targetName}" e sua linguagem do amor predominante é "${targetLanguage}".`,
     config: {
       systemInstruction: `Você é um mentor de relacionamentos especialista no método de Gary Chapman.
@@ -60,12 +60,12 @@ export const generateDailyMission = async (
 };
 
 export const getMissionCompletionFeedback = async (
-  mission: Mission, 
-  partnerName: string, 
+  mission: Mission,
+  partnerName: string,
   userRelato: string
 ): Promise<{ feedback: string, impact: number, success: boolean }> => {
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.0-flash',
     contents: `Missão: "${mission.title}". 
     O que foi pedido: "${mission.description}".
     Relato do usuário: "${userRelato}". 
@@ -92,9 +92,9 @@ export const getMissionCompletionFeedback = async (
   return JSON.parse(response.text?.trim() || '{"feedback": "Erro no feedback", "impact": 0, "success": false}');
 };
 
-export const getCoachAdvice = async (history: {role: string, parts: {text: string}[]}[], userMessage: string): Promise<string> => {
+export const getCoachAdvice = async (history: { role: string, parts: { text: string }[] }[], userMessage: string): Promise<string> => {
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-2.0-flash',
     contents: [...history, { role: 'user', parts: [{ text: userMessage }] }],
     config: {
       systemInstruction: `Você é o "Conselheiro Pastoral" de felicidade conjugal.
