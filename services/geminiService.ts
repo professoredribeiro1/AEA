@@ -148,55 +148,55 @@ export const getMissionCompletionFeedback = async (
 export const getCoachAdvice = async (history: { role: string, parts: { text: string }[] }[], userMessage: string): Promise<string> => {
   try {
     const genAI = getGenAI();
-    const model = (genAI as any).getGenerativeModel({
-      model: "gemini-1.5-flash",
-      systemInstruction: `Você é o "Conselheiro Pastoral" focado em restauração de casamentos.
+    const systemPrompt = `Você é o "Conselheiro Pastoral" focado em restauração de casamentos.
       Sua base é bíblica e psicológica. 
       Sempre encoraje o Amor Sacrificial, o perdão e a paciência.
-      Responda de forma acolhedora, mas prática, sugerindo pequenos passos para melhorar o clima no lar.`
+      Responda de forma acolhedora, mas prática, sugerindo pequenos passos para melhorar o clima no lar.
+      Mantenha suas respostas relativamente curtas e muito encorajadoras.`;
+
+    const model = (genAI as any).getGenerativeModel({
+      model: "gemini-1.5-flash",
+      systemInstruction: systemPrompt
     });
 
-    // Normalização rigorosa do histórico para o Gemini
-    // 1. Deve começar com 'user'
-    // 2. Deve alternar estritamente entre 'user' e 'model'
-    let normalizedHistory = [];
-    let nextExpectedRole = 'user';
+    // Normalização rigorosa do histórico para garantir alternância user/model
+    const validHistory = [];
+    let lastRole = null;
 
+    // O Gemini exige que comece com 'user' e alterne
     for (const msg of history) {
-      if (msg.role === nextExpectedRole) {
-        normalizedHistory.push(msg);
-        nextExpectedRole = nextExpectedRole === 'user' ? 'model' : 'user';
+      if (msg.role === 'model' && validHistory.length === 0) continue; // Pula saudação inicial se for a primeira
+      if (msg.role !== lastRole) {
+        validHistory.push(msg);
+        lastRole = msg.role;
       }
     }
 
-    // Se o histórico normalizado terminar em 'user', o chat vai falhar ao enviar sendMessage
-    // (Pois sendMessage adiciona um novo 'user'). Então removemos o último se for 'user'.
-    if (normalizedHistory.length > 0 && normalizedHistory[normalizedHistory.length - 1].role === 'user') {
-      normalizedHistory.pop();
-    }
-
-    const chat = model.startChat({
-      history: normalizedHistory,
+    // Prepara a chamada no formato que sabemos que funciona (generateContent)
+    const result = await model.generateContent({
+      contents: [...validHistory, { role: 'user', parts: [{ text: userMessage }] }],
       generationConfig: {
         temperature: 0.8,
         topP: 0.95,
-      },
+      }
     });
 
-    const result = await chat.sendMessage(userMessage);
     const responseText = result.response.text();
-
     return responseText || "Estou aqui para ouvir. Como posso ajudar com seu casamento hoje?";
+
   } catch (e: any) {
     console.error('Erro detalhado no Conselheiro:', e);
-    // Tenta uma chamada simples sem histórico como fallback se for erro de histórico
+
+    // Tenta uma última chamada ultra-simples (sem histórico e sem prompt de sistema complexo)
     try {
       const genAI = getGenAI();
       const model = (genAI as any).getGenerativeModel({ model: "gemini-1.5-flash" });
-      const simpleResult = await model.generateContent(userMessage);
+      const simpleResult = await model.generateContent({
+        contents: [{ role: 'user', parts: [{ text: userMessage }] }]
+      });
       return simpleResult.response.text();
-    } catch (fallbackError) {
-      return "Desculpe, tive um problema técnico momentâneo. Mas lembre-se: um gesto de amor sacrificial hoje pode mudar tudo. Tente me perguntar algo novamente.";
+    } catch (fallbackError: any) {
+      return `Desculpe, o Conselheiro está passando por uma manutenção técnica (Erro: ${e.message || 'Desconhecido'}). Mas não perca a fé: um gesto de amor hoje pode mudar tudo. Tente novamente em breve.`;
     }
   }
 };
