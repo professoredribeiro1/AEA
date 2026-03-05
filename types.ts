@@ -68,6 +68,7 @@ export interface UserProfile {
   coupleCode?: string;
   linkedPartnerName?: string;
   isLinked: boolean;
+  partnerId?: string | null;
   tankTheme?: TankTheme;
   gratitudeJournal: GratitudeEntry[];
 }

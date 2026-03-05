@@ -131,7 +131,8 @@ const App: React.FC = () => {
               tankLevel: partnerProfile.tank_level ?? 5,
               languages: partnerProfile.languages || [],
               challenge: partnerProfile.challenge || prev.challenge,
-              isLinked: true
+              isLinked: true,
+              partnerId: profile.partner_id
             }));
           }
         }
@@ -146,6 +147,36 @@ const App: React.FC = () => {
   // Mantém localStorage para backup offline
   useEffect(() => { if (!sessionLoading) localStorage.setItem('love_user_v4', JSON.stringify(user)); }, [user, sessionLoading]);
   useEffect(() => { if (!sessionLoading) localStorage.setItem('love_partner_v4', JSON.stringify(partner)); }, [partner, sessionLoading]);
+
+  // Sincronização em tempo real do termômetro do parceiro
+  useEffect(() => {
+    if (!partner.partnerId || !isAuthenticated) return;
+
+    const channel = supabase
+      .channel('partner_profile_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${partner.partnerId}`
+        },
+        (payload: any) => {
+          if (payload.new && typeof payload.new.tank_level === 'number') {
+            setPartner(prev => ({
+              ...prev,
+              tankLevel: payload.new.tank_level
+            }));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [partner.partnerId, isAuthenticated]);
 
   const handleLogin = (name: string, session?: any) => {
     setUser(prev => ({ ...prev, name }));
@@ -354,7 +385,8 @@ const App: React.FC = () => {
         tankLevel: partnerProfile.tank_level ?? 5,
         languages: partnerProfile.languages || [],
         challenge: partnerProfile.challenge || prev.challenge,
-        isLinked: true
+        isLinked: true,
+        partnerId: partnerProfile.id
       }));
       alert("Conexão estabelecida com sucesso! Você está conectado(a) com " + (partnerProfile.full_name || 'seu(sua) parceiro(a)') + ".");
       setActiveTab('dashboard');
