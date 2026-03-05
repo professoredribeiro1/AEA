@@ -31,7 +31,7 @@ export const generateDailyMission = async (
 
   try {
     const genAI = getGenAI();
-    const model = genAI.getGenerativeModel({
+    const model = (genAI as any).getGenerativeModel({
       model: "gemini-1.5-flash",
       systemInstruction: `Você é um mentor de relacionamentos especialista em psicologia conjugal, no método de Gary Chapman e no conceito teológico e prático de Amor Sacrificial (Ágape).
       
@@ -101,7 +101,8 @@ export const getMissionCompletionFeedback = async (
   userRelato: string
 ): Promise<{ feedback: string, impact: number, success: boolean }> => {
   try {
-    const model = getGenAI().getGenerativeModel({
+    const genAI = getGenAI();
+    const model = (genAI as any).getGenerativeModel({
       model: "gemini-1.5-flash",
       systemInstruction: `Analise o relato de cumprimento.
       - Valorize a consistência e a intenção, não a grandiosidade.
@@ -146,19 +147,28 @@ export const getMissionCompletionFeedback = async (
 
 export const getCoachAdvice = async (history: { role: string, parts: { text: string }[] }[], userMessage: string): Promise<string> => {
   try {
-    const model = getGenAI().getGenerativeModel({
+    const genAI = getGenAI();
+    const model = (genAI as any).getGenerativeModel({
       model: "gemini-1.5-flash",
       systemInstruction: `Você é o "Conselheiro Pastoral" de felicidade conjugal.
       PERSONA:
       - Prático, acolhedor e focado em soluções baseadas em princípios bíblicos e sabedoria prática.
       - Defensor de que "pequenas coisas feitas com muito amor mudam o mundo".
+      - Você deve sempre encorajar o Amor Sacrificial e a paciência.
       OBJETIVO:
       - Transformar conflitos em oportunidades de serviço e crescimento.
       - Sugerir micro-ações imediatas para melhorar o clima da casa.`
     });
 
+    // O Gemini exige que o histórico comece com uma mensagem do usuário ('user').
+    // O primeiro item do nosso histórico geralmente é a saudação do bot ('model'), então filtramos.
+    const validHistory = history.filter((msg, index) => {
+      if (index === 0 && msg.role === 'model') return false;
+      return true;
+    });
+
     const result = await model.generateContent({
-      contents: [...history, { role: 'user', parts: [{ text: userMessage }] }],
+      contents: [...validHistory, { role: 'user', parts: [{ text: userMessage }] }],
       generationConfig: {
         temperature: 0.8,
         topP: 0.95,
@@ -166,8 +176,8 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
     });
 
     return result.response.text() || '';
-  } catch (e) {
-    console.error('Erro no Gemini (getCoachAdvice):', e);
-    return "Desculpe, estou tendo dificuldades em me conectar agora. Lembre-se que um gesto de gentileza hoje pode mudar o clima do seu lar.";
+  } catch (e: any) {
+    console.error('Erro detalhado no Gemini (getCoachAdvice):', e);
+    return "Desculpe, estou tendo dificuldades em me conectar agora. Lembre-se que um gesto de gentileza hoje pode mudar o clima do seu lar. Tente novamente em alguns instantes.";
   }
 };
