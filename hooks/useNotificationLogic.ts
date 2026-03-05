@@ -9,15 +9,15 @@ interface UseNotificationLogicProps {
 }
 
 const STRATEGIC_TIMES = [
-  { hour: 9, minute: 0, message: "Bom dia! Que tal começar o dia semeando amor? Sua missão está te esperando." },
-  { hour: 13, minute: 0, message: "Hora do almoço! Já pensou em como surpreender seu amor hoje?" },
-  { hour: 19, minute: 0, message: "O dia está acabando... Não esqueça de regar seu relacionamento com a missão de hoje!" }
+  { hour: 9, minute: 0, priority: 'normal', message: "Bom dia! Que tal começar o dia semeando amor? Sua missão de Amor Sacrificial te espera." },
+  { hour: 13, minute: 0, priority: 'normal', message: "Hora do almoço! Como você pode servir ao seu amor hoje?" },
+  { hour: 19, minute: 0, priority: 'urgent', message: "O dia está acabando... Regue seu relacionamento com a missão de hoje!" }
 ];
 
 const NOTIFICATION_SOUND_URL = "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3";
 
 export const useNotificationLogic = ({ user, partner, onToggleNotifications }: UseNotificationLogicProps) => {
-  const lastNotificationRef = useRef<string | null>(null);
+  const lastNotificationRef = useRef<string | null>(localStorage.getItem('last_notification_key'));
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -32,60 +32,76 @@ export const useNotificationLogic = ({ user, partner, onToggleNotifications }: U
 
   const sendNotification = (title: string, body: string) => {
     console.log(`[Notification] ${title}: ${body}`);
-    
-    // Tenta tocar o som se estiver ativado, independente da permissão de notificação visual
-    // (Útil para o modo simulado em iframes)
-    if (user.soundEnabled) {
-      playSound();
+
+    if (user.soundEnabled) playSound();
+
+    // Fallback: Se não houver suporte ou permissão, usamos um alert amigável como lembrete "Smart"
+    if (!("Notification" in window) || Notification.permission !== "granted") {
+      if (user.notificationsEnabled) {
+        alert(`${title}\n\n${body}`);
+      }
+      return;
     }
 
-    if (!("Notification" in window)) return;
-    
-    if (Notification.permission === "granted" && user.notificationsEnabled) {
-      try {
-        new Notification(title, { 
-          body, 
-          icon: "https://cdn-icons-png.flaticon.com/512/2589/2589175.png"
-        });
-      } catch (e) {
-        console.error("Erro ao enviar notificação:", e);
-      }
+    try {
+      new Notification(title, {
+        body,
+        icon: "https://cdn-icons-png.flaticon.com/512/2589/2589175.png"
+      });
+    } catch (e) {
+      console.error("Erro ao enviar notificação:", e);
+      alert(body);
     }
   };
 
   useEffect(() => {
     if (!user.notificationsEnabled) return;
 
-    if (Notification.permission === "denied" && user.notificationsEnabled) {
-      onToggleNotifications(false);
-      return;
+    // Solicita permissão se ainda estiver "default"
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
     }
 
-    const interval = setInterval(() => {
+    const checkReminders = () => {
       const now = new Date();
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
       const todayStr = now.toDateString();
 
+      // Verificar se a última missão do dia já foi concluída
       const missions = partner.challenge.missions;
       const latestMission = missions.length > 0 ? missions[missions.length - 1] : null;
       const isMissionCompleted = latestMission?.completed || false;
-
       if (isMissionCompleted) return;
 
-      const slot = STRATEGIC_TIMES.find(t => t.hour === currentHour && Math.abs(t.minute - currentMinute) <= 1);
-      
+      // "Smart": Se o tanque do parceiro estiver crítico, o lembrete é mais urgente
+      const isTankCritical = partner.tankLevel <= 3;
+
+      const slot = STRATEGIC_TIMES.find(t =>
+        (t.hour === currentHour && Math.abs(t.minute - currentMinute) <= 2) ||
+        (t.hour < currentHour && lastNotificationRef.current !== `${todayStr}-${t.hour}`) // Check para lembrete ignorado/app fechado
+      );
+
       if (slot) {
         const notificationKey = `${todayStr}-${slot.hour}`;
         if (lastNotificationRef.current !== notificationKey) {
-          sendNotification("Lembrete Amor em Ação", slot.message);
+          const message = isTankCritical
+            ? `⚠️ O tanque de ${partner.name} está baixo (${partner.tankLevel}/10). Uma missão de Amor Sacrificial agora faria toda a diferença!`
+            : slot.message;
+
+          sendNotification("Lembrete Amor em Ação", message);
           lastNotificationRef.current = notificationKey;
+          localStorage.setItem('last_notification_key', notificationKey);
         }
       }
-    }, 20000);
+    };
+
+    // Executa imediatamente ao abrir e depois a cada minuto
+    checkReminders();
+    const interval = setInterval(checkReminders, 60000);
 
     return () => clearInterval(interval);
-  }, [user.notificationsEnabled, user.soundEnabled, partner.challenge.missions]);
+  }, [user.notificationsEnabled, user.soundEnabled, partner.challenge.missions, partner.tankLevel, partner.name]);
 
   return { sendNotification };
 };

@@ -253,7 +253,9 @@ const App: React.FC = () => {
     try {
       const targetLang = mission.languageApplied || partner.languages[0];
       const currentCycle = partner.challenge.cycleCount || 1;
-      const lighterData = await generateDailyMission(targetLang, partner.name, mission.day, currentCycle, true, mission.description);
+
+      const newRejectedList = [...(mission.rejectedDescriptions || []), mission.description];
+      const lighterData = await generateDailyMission(targetLang, partner.name, mission.day, currentCycle, true, newRejectedList);
 
       const lighterMission: Mission = {
         id: Math.random().toString(36).substr(2, 9),
@@ -264,10 +266,10 @@ const App: React.FC = () => {
         completed: false,
         languageApplied: targetLang,
         isAlternative: true,
-        originalMissionId: mission.id
+        originalMissionId: mission.id,
+        rejectedDescriptions: newRejectedList
       };
 
-      // Substitui a missão atual pela nova missão leve (não mantém a antiga no histórico)
       const updatedMissions = partner.challenge.missions.map(m =>
         m.id === mission.id ? lighterMission : m
       );
@@ -278,11 +280,13 @@ const App: React.FC = () => {
         challenge: newChallenge
       }));
       if (supabaseUserId) updateChallenge(supabaseUserId, newChallenge);
-      setIsReadyForMission(false); // Volta para o estado de visualização para a nova missão
+      setIsReadyForMission(false);
 
-      const skipMessage = mission.isAlternative
-        ? "Tudo bem. O mais importante é o seu coração estar em paz. Vamos tentar algo ainda mais simples e restaurador. Lembre-se: o amor também é ter paciência consigo mesmo."
-        : "Entendo perfeitamente. O amor também é saber respeitar o próprio tempo. Por enquanto, preparamos algo mais leve e diferente para você realizar hoje.";
+      const skipMessage = newRejectedList.length > 2
+        ? "Tudo bem! O amor tem muitas faces. Estamos buscando a tarefa perfeita para o seu momento atual. Tente esta nova opção."
+        : mission.isAlternative
+          ? "Tudo bem. O mais importante é o seu coração estar em paz. Vamos tentar algo ainda mais simples e restaurador."
+          : "Entendo perfeitamente. O amor também é saber respeitar o próprio tempo. Preparamos algo mais leve para você.";
 
       alert(skipMessage);
     } finally {

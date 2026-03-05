@@ -18,7 +18,7 @@ export const generateDailyMission = async (
   dayNumber: number,
   cycleNumber: number = 1,
   isLighter: boolean = false,
-  avoidContent?: string
+  avoidContentList?: string[]
 ): Promise<Partial<Mission>> => {
   const themes = [
     "Fundação e Reconexão Básica",
@@ -33,29 +33,39 @@ export const generateDailyMission = async (
     const genAI = getGenAI();
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
-      systemInstruction: `Você é um mentor de relacionamentos especialista no método de Gary Chapman.
-      SEU OBJETIVO: Criar uma tarefa simples, curta e potente que fortaleça o vínculo com ${targetName} através da linguagem "${targetLanguage}".
+      systemInstruction: `Você é um mentor de relacionamentos especialista no método de Gary Chapman e no conceito de Amor Sacrificial.
       
-      ${isLighter ? 'REQUISITO ESPECIAL: Esta missão deve ser EXTREMAMENTE LEVE, PASSIVA e TOTALMENTE DIFERENTE da missão anterior. Ela deve ser focada em pequenos gestos que não exijam quase nenhum esforço emocional ou interação direta obrigatória, ideal para quando o usuário está se sentindo muito machucado, exausto ou desconfortável. Não deve ter NENHUMA relação com a tarefa que o usuário recusou. Foque em atos de bondade silenciosos, oração, ou pequenos cuidados que curem sem pressionar o usuário a se expor.' : ''}
-
-      CONTEXTO DO CICLO:
-      Estamos no Ciclo ${cycleNumber} com o tema "${currentTheme}". 
-      ${cycleNumber === 1 ? 'Foque em ações simples de reconexão.' : 'Foque em ações mais profundas, criativas e que exijam maior entrega emocional.'}
+      OBJETIVO CENTRAL: Criar uma tarefa onde o usuário SERVE ao seu cônjuge (${targetName}) baseando-se na linguagem "${targetLanguage}".
+      
+      REGRA DE OURO: A missão NUNCA deve ser para o próprio usuário fazer algo para si mesmo. Deve ser sempre uma ação DIRECIONADA AO PARCEIRO. É Amor Sacrificial: o usuário doa algo de si para o outro.
+      
+      ${isLighter ? 'REQUISITO ESPECIAL: Esta missão deve ser EXTREMAMENTE LEVE E SUAVE. Ideal para quando o usuário está exausto ou em conflito. Foque em gestos silenciosos, oração, um bilhete simples ou um pequeno cuidado que não exija diálogo profundo, mas que demonstre "estou aqui por você".' : ''}
 
       REGRAS PARA A MISSÃO:
-      1. SIMPLICIDADE ABSOLUTA: A tarefa deve ser realizável em menos de 15 minutos e não deve exigir gastos financeiros significativos ou logística complexa.
-      2. REPLICABILIDADE: Foque em ações que possam se tornar hábitos. O usuário deve sentir que "pode fazer isso sempre".
-      3. CONEXÃO DIRETA: A missão deve atingir o coração da linguagem "${targetLanguage}". 
-      4. TOM: Inspirador, prático e focado no cuidado.
+      1. TOTALMENTE EXTERNA: O beneficiário da ação deve ser SEMPRE o cônjuge (${targetName}).
+      2. SIMPLICIDADE PRÁTICA: Realizável em menos de 15 minutos sem grandes custos.
+      3. CONEXÃO COM A LINGUAGEM: Deve ser um "depósito" claro no tanque de "${targetLanguage}".
+      4. VARIEDADE CRIATIVA: Evite clichês óbvios se possível.
       
-      ESTRUTURA:
-      - title: Nome curto e acionável.
-      - description: Instrução passo a passo de como executar.
-      - rationale: Explicação breve de por que esse pequeno gesto é um "depósito" gigante no tanque emocional de quem fala "${targetLanguage}".`,
+      ESTRUTURA JSON:
+      - title: Nome da missão.
+      - description: Passo a passo claro (ex: "Escreva um bilhete...", "Lave a louça...", "Dê um abraço...").
+      - rationale: Por que isso é importante para quem fala "${targetLanguage}".`,
     });
 
+    const avoidText = avoidContentList && avoidContentList.length > 0
+      ? `\n\nIMPORTANTE: O usuário REJEITOU as seguintes ideias de missões anteriores: "${avoidContentList.join('", "')}". \nVOCÊ DEVE sugerir algo TOTALMENTE DIFERENTE de todas estas acima.`
+      : '';
+
     const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: `Gere uma missão prática de "Amor Sacrificial" ${isLighter ? 'LEVE E SUAVE ' : ''}para o dia ${dayNumber} do Ciclo ${cycleNumber} (Tema: ${currentTheme}). O alvo é "${targetName}" e sua linguagem do amor predominante é "${targetLanguage}". ${avoidContent ? `O usuário acaba de recusar a seguinte missão por se sentir mal em realizá-la agora: "${avoidContent}". NÃO REPITA ESTE TEMA OU AÇÃO. Sugira algo totalmente diferente.` : ''}` }] }],
+      contents: [{
+        role: "user", parts: [{
+          text: `Gere uma missão de "Amor Sacrificial" para o dia ${dayNumber} do Ciclo ${cycleNumber}. 
+      Alvo: ${targetName} 
+      Linguagem do Alvo: ${targetLanguage}
+      Tema do Ciclo: ${currentTheme}${avoidText}`
+        }]
+      }],
       generationConfig: {
         responseMimeType: "application/json",
         responseSchema: {

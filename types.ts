@@ -40,6 +40,7 @@ export interface Mission {
   skipped?: boolean;
   isAlternative?: boolean;
   originalMissionId?: string;
+  rejectedDescriptions?: string[]; // Para evitar repetição em múltiplos skips
 }
 
 export interface Challenge {
