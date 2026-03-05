@@ -150,34 +150,53 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
     const genAI = getGenAI();
     const model = (genAI as any).getGenerativeModel({
       model: "gemini-1.5-flash",
-      systemInstruction: `Você é o "Conselheiro Pastoral" de felicidade conjugal.
-      PERSONA:
-      - Prático, acolhedor e focado em soluções baseadas em princípios bíblicos e sabedoria prática.
-      - Defensor de que "pequenas coisas feitas com muito amor mudam o mundo".
-      - Você deve sempre encorajar o Amor Sacrificial e a paciência.
-      OBJETIVO:
-      - Transformar conflitos em oportunidades de serviço e crescimento.
-      - Sugerir micro-ações imediatas para melhorar o clima da casa.`
+      systemInstruction: `Você é o "Conselheiro Pastoral" focado em restauração de casamentos.
+      Sua base é bíblica e psicológica. 
+      Sempre encoraje o Amor Sacrificial, o perdão e a paciência.
+      Responda de forma acolhedora, mas prática, sugerindo pequenos passos para melhorar o clima no lar.`
     });
 
-    // O Gemini exige que o histórico comece com uma mensagem do usuário ('user').
-    // O primeiro item do nosso histórico geralmente é a saudação do bot ('model'), então filtramos.
-    const validHistory = history.filter((msg, index) => {
-      if (index === 0 && msg.role === 'model') return false;
-      return true;
-    });
+    // Normalização rigorosa do histórico para o Gemini
+    // 1. Deve começar com 'user'
+    // 2. Deve alternar estritamente entre 'user' e 'model'
+    let normalizedHistory = [];
+    let nextExpectedRole = 'user';
 
-    const result = await model.generateContent({
-      contents: [...validHistory, { role: 'user', parts: [{ text: userMessage }] }],
+    for (const msg of history) {
+      if (msg.role === nextExpectedRole) {
+        normalizedHistory.push(msg);
+        nextExpectedRole = nextExpectedRole === 'user' ? 'model' : 'user';
+      }
+    }
+
+    // Se o histórico normalizado terminar em 'user', o chat vai falhar ao enviar sendMessage
+    // (Pois sendMessage adiciona um novo 'user'). Então removemos o último se for 'user'.
+    if (normalizedHistory.length > 0 && normalizedHistory[normalizedHistory.length - 1].role === 'user') {
+      normalizedHistory.pop();
+    }
+
+    const chat = model.startChat({
+      history: normalizedHistory,
       generationConfig: {
         temperature: 0.8,
         topP: 0.95,
-      }
+      },
     });
 
-    return result.response.text() || '';
+    const result = await chat.sendMessage(userMessage);
+    const responseText = result.response.text();
+
+    return responseText || "Estou aqui para ouvir. Como posso ajudar com seu casamento hoje?";
   } catch (e: any) {
-    console.error('Erro detalhado no Gemini (getCoachAdvice):', e);
-    return "Desculpe, estou tendo dificuldades em me conectar agora. Lembre-se que um gesto de gentileza hoje pode mudar o clima do seu lar. Tente novamente em alguns instantes.";
+    console.error('Erro detalhado no Conselheiro:', e);
+    // Tenta uma chamada simples sem histórico como fallback se for erro de histórico
+    try {
+      const genAI = getGenAI();
+      const model = (genAI as any).getGenerativeModel({ model: "gemini-1.5-flash" });
+      const simpleResult = await model.generateContent(userMessage);
+      return simpleResult.response.text();
+    } catch (fallbackError) {
+      return "Desculpe, tive um problema técnico momentâneo. Mas lembre-se: um gesto de amor sacrificial hoje pode mudar tudo. Tente me perguntar algo novamente.";
+    }
   }
 };
