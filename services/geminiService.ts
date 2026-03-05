@@ -9,6 +9,7 @@ const getGenAI = () => {
   if (!GEMINI_API_KEY) {
     console.error("ERRO CRÍTICO: Chave da IA não encontrada. O Conselheiro e Missões não funcionarão.");
   }
+  // No @google/genai v1.34.0+, passamos a chave no objeto de configuração
   return new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 };
 
@@ -30,43 +31,30 @@ export const generateDailyMission = async (
   const currentTheme = themes[(cycleNumber - 1) % themes.length];
 
   try {
-    const genAI = getGenAI();
-    const model = (genAI as any).getGenerativeModel({
-      model: "gemini-1.5-flash",
-      systemInstruction: `Você é um mentor de relacionamentos especialista em psicologia conjugal, no método de Gary Chapman e no conceito teológico e prático de Amor Sacrificial (Ágape).
-      
-      OBJETIVO CENTRAL: Criar uma missão PROFUNDA e SIGNIFICATIVA onde o usuário SERVE ao seu cônjuge (${targetName}) baseando-se na linguagem "${targetLanguage}".
-      
-      ESSÊNCIA DA PROFUNDIDADE:
-      - Evite o óbvio e o raso (ex: não peça apenas para dar um beijo ou dizer obrigado).
-      - Peça ações que envolvam INTENCIONALIDADE, PLANEJAMENTO e ENTREGA.
-      - A missão deve tocar a alma e as necessidades emocionais profundas de quem tem "${targetLanguage}" como linguagem principal.
-      - Use o conceito de "Amor Sacrificial": algo que exige que o usuário abra mão de um pouco da sua conveniência, tempo ou preferência para honrar o outro.
-      
-      REGRA DE OURO: A missão NUNCA deve ser para o próprio usuário fazer algo para si mesmo. Deve ser sempre uma ação DIRECIONADA AO PARCEIRO.
-      
-      ${isLighter ? 'VERSÃO SUAVE (CUIDADO): Esta missão ainda deve ser profunda, mas executada de forma LEVE e RESTAURADORA. Foque em atos de bondade silenciosos que dizem "Eu vejo você e cuido de você", sem exigir do usuário uma carga emocional que ele não consiga carregar no momento.' : ''}
+    const client = getGenAI();
 
+    const systemPrompt = `Você é um mentor de relacionamentos especialista em psicologia conjugal, no método de Gary Chapman e no conceito teológico e prático de Amor Sacrificial (Ágape).
+      OBJETIVO CENTRAL: Criar uma missão PROFUNDA e SIGNIFICATIVA onde o usuário SERVE ao seu cônjuge (${targetName}) baseando-se na linguagem "${targetLanguage}".
+      REGRA DE OURO: A missão NUNCA deve ser para o próprio usuário fazer algo para si mesmo. Deve ser sempre uma ação DIRECIONADA AO PARCEIRO.
+      ${isLighter ? 'VERSÃO SUAVE: Esta missão ainda deve ser profunda, mas executada de forma LEVE e RESTAURADORA.' : ''}
       ESTRUTURA DA RESPOSTA:
       - title: Um nome poético e forte para a ação.
-      - description: Passo a passo claro, mas carregado de propósito (ex: em vez de "Lave a louça", use "Assuma uma responsabilidade que costuma pesar sobre seu cônjuge, executando-a com excelência e sem reclamar, para que ele(a) possa descansar").
-      - rationale: Uma explicação profunda do IMPACTO PSICOLÓGICO e EMOCIONAL desta ação específica no coração de quem fala "${targetLanguage}".`,
-    });
+      - description: Passo a passo claro.
+      - rationale: Explicação do impacto profundo no coração de quem fala "${targetLanguage}".`;
 
     const avoidText = avoidContentList && avoidContentList.length > 0
-      ? `\n\nIMPORTANTE: O usuário REJEITOU as seguintes ideias de missões anteriores: "${avoidContentList.join('", "')}". \nVOCÊ DEVE sugerir algo TOTALMENTE DIFERENTE de todas estas acima.`
+      ? `\n\nIMPORTANTE: Evite temas como: "${avoidContentList.join('", "')}".`
       : '';
 
-    const result = await model.generateContent({
+    const result = await client.models.generateContent({
+      model: "gemini-1.5-flash",
       contents: [{
         role: "user", parts: [{
-          text: `Gere uma missão de "Amor Sacrificial" para o dia ${dayNumber} do Ciclo ${cycleNumber}. 
-      Alvo: ${targetName} 
-      Linguagem do Alvo: ${targetLanguage}
-      Tema do Ciclo: ${currentTheme}${avoidText}`
+          text: `Gere uma missão de "Amor Sacrificial" para o dia ${dayNumber} do Ciclo ${cycleNumber}. Alvo: ${targetName} (${targetLanguage}). Tema: ${currentTheme}${avoidText}`
         }]
       }],
-      generationConfig: {
+      config: {
+        systemInstruction: systemPrompt,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -80,7 +68,7 @@ export const generateDailyMission = async (
       }
     });
 
-    const responseText = result.response.text();
+    const responseText = result.text || "";
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     const cleanJson = jsonMatch ? jsonMatch[0] : responseText;
 
@@ -101,26 +89,18 @@ export const getMissionCompletionFeedback = async (
   userRelato: string
 ): Promise<{ feedback: string, impact: number, success: boolean }> => {
   try {
-    const genAI = getGenAI();
-    const model = (genAI as any).getGenerativeModel({
-      model: "gemini-1.5-flash",
-      systemInstruction: `Analise o relato de cumprimento.
-      - Valorize a consistência e a intenção, não a grandiosidade.
-      - Se o usuário descreveu o que fez com sinceridade, success é true.
-      - Ofereça um feedback encorajador que mostre como esse pequeno passo constrói uma relação inabalável.
-      - Impact: Atribua de 0.3 a 1.5 baseado no nível de conexão demonstrado no relato.`
-    });
+    const client = getGenAI();
+    const systemPrompt = `Analise o relato de cumprimento de missão de amor sacrificial para ${partnerName}. Valorize a intenção. Se sincero, success=true.`;
 
-    const result = await model.generateContent({
+    const result = await client.models.generateContent({
+      model: "gemini-1.5-flash",
       contents: [{
         role: "user", parts: [{
-          text: `Missão: "${mission.title}". 
-      O que foi pedido: "${mission.description}".
-      Relato do usuário: "${userRelato}". 
-      Avalie o cumprimento desta pequena meta diária para ${partnerName}.`
+          text: `Missão: "${mission.title}". Relato: "${userRelato}".`
         }]
       }],
-      generationConfig: {
+      config: {
+        systemInstruction: systemPrompt,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -134,69 +114,57 @@ export const getMissionCompletionFeedback = async (
       }
     });
 
-    const responseText = result.response.text();
+    const responseText = result.text || "";
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     const cleanJson = jsonMatch ? jsonMatch[0] : responseText;
 
     return JSON.parse(cleanJson);
   } catch (e) {
     console.error('Erro no Gemini (getMissionCompletionFeedback):', e);
-    return { feedback: "Sua missão foi registrada! O amor é construído nos pequenos gestos diários.", impact: 0.5, success: true };
+    return { feedback: "Missão registrada! Continue firme no propósito.", impact: 0.5, success: true };
   }
 };
 
 export const getCoachAdvice = async (history: { role: string, parts: { text: string }[] }[], userMessage: string): Promise<string> => {
   try {
-    const genAI = getGenAI();
-    const systemPrompt = `Você é o "Conselheiro Pastoral" focado em restauração de casamentos.
-      Sua base é bíblica e psicológica. 
-      Sempre encoraje o Amor Sacrificial, o perdão e a paciência.
-      Responda de forma acolhedora, mas prática, sugerindo pequenos passos para melhorar o clima no lar.
-      Mantenha suas respostas relativamente curtas e muito encorajadoras.`;
-
-    const model = (genAI as any).getGenerativeModel({
-      model: "gemini-1.5-flash",
-      systemInstruction: systemPrompt
-    });
+    const client = getGenAI();
+    const systemPrompt = `Você é o "Conselheiro Pastoral" focado em restauração de casamentos. Bíblico e psicológico. Encoraje Amor Sacrificial, perdão e paciência.`;
 
     // Normalização rigorosa do histórico para garantir alternância user/model
     const validHistory = [];
     let lastRole = null;
 
-    // O Gemini exige que comece com 'user' e alterne
     for (const msg of history) {
-      if (msg.role === 'model' && validHistory.length === 0) continue; // Pula saudação inicial se for a primeira
+      if (msg.role === 'model' && validHistory.length === 0) continue;
       if (msg.role !== lastRole) {
         validHistory.push(msg);
         lastRole = msg.role;
       }
     }
 
-    // Prepara a chamada no formato que sabemos que funciona (generateContent)
-    const result = await model.generateContent({
+    const result = await client.models.generateContent({
+      model: "gemini-1.5-flash",
       contents: [...validHistory, { role: 'user', parts: [{ text: userMessage }] }],
-      generationConfig: {
+      config: {
+        systemInstruction: systemPrompt,
         temperature: 0.8,
         topP: 0.95,
       }
     });
 
-    const responseText = result.response.text();
-    return responseText || "Estou aqui para ouvir. Como posso ajudar com seu casamento hoje?";
-
+    return result.text || "Estou aqui para ouvir. Como posso ajudar?";
   } catch (e: any) {
     console.error('Erro detalhado no Conselheiro:', e);
 
-    // Tenta uma última chamada ultra-simples (sem histórico e sem prompt de sistema complexo)
     try {
-      const genAI = getGenAI();
-      const model = (genAI as any).getGenerativeModel({ model: "gemini-1.5-flash" });
-      const simpleResult = await model.generateContent({
+      const client = getGenAI();
+      const simpleResult = await client.models.generateContent({
+        model: "gemini-1.5-flash",
         contents: [{ role: 'user', parts: [{ text: userMessage }] }]
       });
-      return simpleResult.response.text();
+      return simpleResult.text || "Pode repetir a pergunta, por favor?";
     } catch (fallbackError: any) {
-      return `Desculpe, o Conselheiro está passando por uma manutenção técnica (Erro: ${e.message || 'Desconhecido'}). Mas não perca a fé: um gesto de amor hoje pode mudar tudo. Tente novamente em breve.`;
+      return `Desculpe, tive um problema de conexão com a inteligência artificial. Mas lembre-se: o amor sacrificial é o caminho. Tente perguntar novamente em instantes.`;
     }
   }
 };
