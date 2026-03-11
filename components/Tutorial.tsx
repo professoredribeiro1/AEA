@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Heart, Sparkles, UserSearch, Target, ArrowRight, Check } from 'lucide-react';
 
@@ -17,7 +18,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
     {
       icon: <Target className="w-12 h-12 text-rose-500" />,
       title: "Identifique o Parceiro",
-      description: "O segredo de um casamento feliz é amar o outro na língua que ele entende. Defina a linguagem do seu parceiro no painel."
+      description: "O segredo de um casamento feliz é amar o outro na linguagem que ele entende. Defina a linguagem do seu parceiro no painel."
     },
     {
       icon: <Sparkles className="w-12 h-12 text-rose-500" />,
@@ -35,7 +36,7 @@ const Tutorial: React.FC<TutorialProps> = ({ onComplete }) => {
     <div className="fixed inset-0 z-[100] bg-rose-900/40 backdrop-blur-xl flex items-center justify-center p-6">
       <div className="bg-white w-full max-w-lg rounded-[3rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
         <div className="p-12 flex flex-col items-center text-center">
-          <div className="mb-8 p-6 bg-rose-50 rounded-3xl">
+          <div className="mb-8 p-6 bg-rose-50 rounded-[3rem]">
             {steps[step].icon}
           </div>
           <h2 className="text-3xl font-black text-rose-900 mb-4">{steps[step].title}</h2>

@@ -53,7 +53,7 @@ const Paywall: React.FC<PaywallProps> = ({ onSubscribe, isExpired }) => {
             </div>
             
             <div className="space-y-5 mb-12 flex-1">
-              {[
+             {[
                 'IA Mentora Ilimitada',
                 'Desafios 60 Dias',
                 'Tanque de Amor Ilimitado',

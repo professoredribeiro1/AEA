@@ -24,7 +24,7 @@ const MyChallenges: React.FC<MyChallengesProps> = ({
       <div className="max-w-4xl mx-auto py-12 text-center animate-in fade-in slide-in-from-bottom-4">
         <div className="bg-white p-12 rounded-[3rem] shadow-xl border border-rose-100">
           <History className="w-16 h-16 text-rose-200 mx-auto mb-6" />
-          <h2 className="text-3xl font-black text-rose-900 mb-4 tracking-tight">Seu Histórico de Amor</h2>
+          <h2 className="text-3xl font-black text-rose-900 mb-4 tracking-tight">Sem Histórico de Amor</h2>
           <p className="text-gray-600 mb-10 max-w-md mx-auto leading-relaxed">
             Sua jornada de blindagem emocional ainda não começou. Inicie o desafio de 60 dias para ver seu progresso aqui.
           </p>
@@ -165,14 +165,14 @@ const MyChallenges: React.FC<MyChallengesProps> = ({
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-1">
-                    <h4 className={`font-black text-lg truncate ${m.completed ? 'text-rose-900' : 'text-slate-500'}`}>
-                      {m.title}
-                    </h4>
-                    {m.completed && (
-                      <div className="flex items-center gap-1 bg-green-50 text-green-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-green-100">
-                        <CheckCircle2 className="w-3 h-3" /> Validada
-                      </div>
-                    )}
+                      <h4 className={`font-black text-lg truncate ${m.completed ? 'text-rose-900' : 'text-slate-500'}`}>
+                        {m.title}
+                      </h4>
+                      {m.completed && (
+                        <div className="flex items-center gap-1 bg-green-50 text-green-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-green-100">
+                            <CheckCircle2 className="w-3 h-3" /> Validada
+                        </div>
+                      )}
                   </div>
                   <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed mb-4">
                     {m.description}
@@ -180,12 +180,12 @@ const MyChallenges: React.FC<MyChallengesProps> = ({
                   
                   {m.completed && m.aiFeedback && (
                     <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-4 animate-in slide-in-from-top-2">
-                       <p className="text-[9px] font-black text-rose-400 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
-                         <Star className="w-3 h-3 fill-rose-400" /> Feedback do Mentor
-                       </p>
-                       <p className="text-xs text-slate-600 italic leading-relaxed">
-                         "{m.aiFeedback}"
-                       </p>
+                        <p className="text-[9px] font-black text-rose-400 uppercase tracking-[0.2em] mb-2 flex items-center gap-2">
+                           <Star className="w-3 h-3 fill-rose-400" /> Feedback do Mentor
+                        </p>
+                        <p className="text-xs text-slate-600 italic leading-relaxed">
+                          "{m.aiFeedback}"
+                        </p>
                     </div>
                   )}
 
@@ -194,22 +194,22 @@ const MyChallenges: React.FC<MyChallengesProps> = ({
                       <span className="text-[10px] text-slate-400 font-bold">
                         Concluído em: {new Date(m.completedAt!).toLocaleDateString('pt-BR')}
                       </span>
-                      <button 
-                        onClick={() => onRedoMission(m.id)} 
-                        className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-black hover:bg-rose-600 hover:text-white transition-all uppercase tracking-wider"
-                      >
-                        <RotateCcw className="w-3 h-3" /> Refazer Missão
-                      </button>
+                        <button 
+                          onClick={() => onRedoMission(m.id)} 
+                          className="flex items-center gap-1.5 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-black hover:bg-rose-600 hover:text-white transition-all uppercase tracking-wider"
+                        >
+                          <RotateCcw className="w-3 h-3" /> Refazer Missão
+                        </button>
                     </div>
-                  ) : (
+                    ) : (
                     <button 
                       onClick={onGoToChallenge}
                       className="text-xs font-bold text-rose-600 hover:underline flex items-center gap-1"
                     >
-                      Ver detalhes da missão <ArrowRight className="w-3 h-3" />
+                        Ver detalhes da missão <ArrowRight className="w-3 h-3" />
                     </button>
                   )}
-                </div>
+                  </div>
               </div>
             </div>
           ))}

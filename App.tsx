@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { LoveLanguage, UserProfile, Challenge, Mission, SubscriptionInfo, Message, TankTheme, GratitudeEntry } from './types';
 import { fetchMyProfile, fetchPartnerProfile, linkWithPartner, updateTankLevel, updateLanguages, updateChallenge, ensureCoupleCode } from './services/profileService';
 import { LANGUAGE_METADATA } from './constants.tsx';
@@ -14,15 +15,15 @@ import GratitudeJournal from './components/GratitudeJournal';
 import LandingPage from './components/LandingPage';
 import { generateDailyMission, getMissionCompletionFeedback } from './services/geminiService';
 import { supabase } from './services/supabase';
-import {
-  Heart, Sparkles, Calendar, Trophy,
+import { 
+  Heart, Sparkles, Calendar, Trophy, 
   ChevronRight, UserPlus, Link2, Sun, Compass, TrendingUp, Clock3, LogOut
 } from 'lucide-react';
 
 const App: React.FC = () => {
   const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
   const emptyChallenge: Challenge = { type: null, startDate: null, missions: [], cycleCount: 1 };
-
+  
   const getInitialSubscription = (): SubscriptionInfo => {
     const saved = localStorage.getItem('love_user_v4');
     if (saved) {
@@ -37,18 +38,18 @@ const App: React.FC = () => {
 
   const [user, setUser] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('love_user_v4');
-    return saved ? JSON.parse(saved) : {
+    return saved ? JSON.parse(saved) : { 
       name: '', languages: [], tankLevel: 5, challenge: emptyChallenge,
       hasFinishedTutorial: false, subscription: getInitialSubscription(), notificationsEnabled: false,
       soundEnabled: true,
-      coupleCode: Math.random().toString(36).substring(2, 8).toUpperCase(), isLinked: false,
+      coupleCode: Math.random().toString(36).substring(2, 8).toUpperCase(), isLinked: false, 
       tankTheme: TankTheme.MODERN, gratitudeJournal: []
     };
   });
 
   const [partner, setPartner] = useState<UserProfile>(() => {
     const saved = localStorage.getItem('love_partner_v4');
-    return saved ? JSON.parse(saved) : {
+    return saved ? JSON.parse(saved) : { 
       name: 'Parceiro(a)', languages: [], tankLevel: 5, challenge: emptyChallenge,
       hasFinishedTutorial: true, subscription: getInitialSubscription(), notificationsEnabled: false,
       soundEnabled: true,
@@ -63,6 +64,50 @@ const App: React.FC = () => {
   const [fulfillmentText, setFulfillmentText] = useState('');
   const [showCelebration, setShowCelebration] = useState(false);
   const [isReadyForMission, setIsReadyForMission] = useState(false);
+  
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // WebSocket for real-time tank sync (fallback/complement to Supabase Realtime)
+  useEffect(() => {
+    let ws: WebSocket;
+    let reconnectTimer: any;
+
+    const connect = () => {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${window.location.host}`);
+      wsRef.current = ws;
+
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'TANK_UPDATE') {
+            setPartner(prev => ({ ...prev, tankLevel: message.level }));
+          }
+        } catch (e) {
+          console.error("Error parsing WS message:", e);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log("WS closed, reconnecting in 3s...");
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+
+      ws.onerror = (err) => {
+        console.error("WS error:", err);
+        ws.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      clearTimeout(reconnectTimer);
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        ws.close();
+      }
+    };
+  }, []);
 
   const { sendNotification } = useNotificationLogic({
     user,
@@ -148,7 +193,7 @@ const App: React.FC = () => {
   useEffect(() => { if (!sessionLoading) localStorage.setItem('love_user_v4', JSON.stringify(user)); }, [user, sessionLoading]);
   useEffect(() => { if (!sessionLoading) localStorage.setItem('love_partner_v4', JSON.stringify(partner)); }, [partner, sessionLoading]);
 
-  // Sincronização em tempo real do termômetro do parceiro
+  // Sincronização em tempo real do termômetro do parceiro via Supabase
   useEffect(() => {
     if (!partner.partnerId || !isAuthenticated) return;
 
@@ -191,6 +236,16 @@ const App: React.FC = () => {
     setIsAuthenticated(false);
     setLoadingProfile(false);
     setActiveTab('dashboard');
+  };
+
+  const handleTankUpdate = (level: number) => {
+    setUser(p => ({ ...p, tankLevel: level }));
+    if (supabaseUserId) updateTankLevel(supabaseUserId, level);
+    
+    // Also send via WebSocket for immediate sync if connected
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'TANK_UPDATE', level }));
+    }
   };
 
   const handleRedoMission = (id: string) => {
@@ -462,7 +517,7 @@ const App: React.FC = () => {
               <div className="absolute -inset-1 bg-gradient-to-r from-rose-500 to-indigo-600 rounded-[3.5rem] blur opacity-10 group-hover:opacity-25 transition duration-1000"></div>
               <div className="relative glass-card p-10 md:p-14 rounded-[3.5rem] flex flex-col md:flex-row justify-between items-center gap-10">
                 <div className="flex-1 space-y-6">
-                  <div className="inline-flex items-center gap-2 px-5 py-2 bg-rose-50 text-rose-600 rounded-full text-xs font-black uppercase tracking-widest border border-rose-100">
+                   <div className="inline-flex items-center gap-2 px-5 py-2 bg-rose-50 text-rose-600 rounded-full text-xs font-black uppercase tracking-widest border border-rose-100">
                     <Clock3 className="w-4 h-4" /> Micro-Ação do Dia
                   </div>
                   <h2 className="text-4xl md:text-5xl font-black text-rose-950 leading-tight">Pronto para blindar seu amor <span className="text-rose-600 italic">hoje?</span></h2>
@@ -536,8 +591,8 @@ const App: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-              <TankGauge label="Termômetro Diário" type="self" level={user.tankLevel} onUpdate={(v) => { setUser(p => ({ ...p, tankLevel: v })); if (supabaseUserId) updateTankLevel(supabaseUserId, v); }} theme={user.tankTheme || TankTheme.MODERN} onThemeChange={(t) => setUser(p => ({ ...p, tankTheme: t }))} />
-              <TankGauge label="Termômetro do Parceiro" type="partner" level={partner.tankLevel} onUpdate={() => { }} theme={user.tankTheme || TankTheme.MODERN} onThemeChange={(t) => setUser(p => ({ ...p, tankTheme: t }))} />
+              <TankGauge label="Termômetro Diário" type="self" level={user.tankLevel} onUpdate={handleTankUpdate} theme={user.tankTheme || TankTheme.MODERN} onThemeChange={(t) => setUser(p => ({ ...p, tankTheme: t }))} />
+              <TankGauge label="Termômetro do Parceiro" type="partner" level={partner.tankLevel} onUpdate={() => {}} theme={user.tankTheme || TankTheme.MODERN} onThemeChange={(t) => setUser(p => ({ ...p, tankTheme: t }))} />
             </div>
           </div>
         );
@@ -552,23 +607,13 @@ const App: React.FC = () => {
                 <h2 className="text-5xl font-black text-rose-950 mb-8 tracking-tight">Comece a Semear</h2>
                 <p className="text-slate-500 text-xl mb-12 max-w-2xl mx-auto font-medium">60 dias de Amor Sacrificial transformarão seu casamento em algo duradouro e prazeroso.</p>
                 {partner.languages.length >= 2 && user.isLinked ? (
-                  <button onClick={async () => {
-                    setLoadingMission(true);
-                    const targetLang = partner.languages[0];
-                    const d = await generateDailyMission(targetLang, partner.name, 1);
-                    const newChallenge: Challenge = { type: 60, startDate: new Date().toISOString(), cycleCount: 1, missions: [{ id: Math.random().toString(36).substr(2, 9), day: 1, title: d.title!, description: d.description!, rationale: d.rationale!, completed: false, languageApplied: targetLang }] };
-                    setPartner(p => ({ ...p, challenge: newChallenge }));
-                    if (supabaseUserId) updateChallenge(supabaseUserId, newChallenge);
-                    setLoadingMission(false);
-                  }} className="w-full max-w-md bg-rose-600 p-8 rounded-[2.5rem] hover:bg-rose-700 transition-all text-white group shadow-2xl">
+                  <button onClick={async () => { setLoadingMission(true); const targetLang = partner.languages[0]; const d = await generateDailyMission(targetLang, partner.name, 1); const newChallenge: Challenge = { type: 60, startDate: new Date().toISOString(), cycleCount: 1, missions: [{ id: Math.random().toString(36).substr(2, 9), day: 1, title: d.title!, description: d.description!, rationale: d.rationale!, completed: false, languageApplied: targetLang }] }; setPartner(p => ({ ...p, challenge: newChallenge })); if (supabaseUserId) updateChallenge(supabaseUserId, newChallenge); setLoadingMission(false); }} className="w-full max-w-md bg-rose-600 p-8 rounded-[2.5rem] hover:bg-rose-700 transition-all text-white group shadow-2xl">
                     <span className="block font-black text-3xl mb-1 uppercase tracking-tighter">Ativar Desafio</span>
                     <span className="text-rose-100 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"><Sparkles className="w-3 h-3" /> Receber Primeira Missão</span>
                   </button>
                 ) : (
                   <div className="space-y-6 flex flex-col items-center">
-                    <p className="text-rose-600 font-bold bg-rose-50 px-6 py-3 rounded-2xl border border-rose-100 italic">
-                      "Para semear no coração de quem você ama, primeiro precisamos saber o que ele(a) valoriza."
-                    </p>
+                    <p className="text-rose-600 font-bold bg-rose-50 px-6 py-3 rounded-2xl border border-rose-100 italic">"Para semear no coração de quem você ama, primeiro precisamos saber o que ele(a) valoriza."</p>
                     <p className="text-slate-400 text-sm max-w-md">Conecte-se com seu parceiro para liberar as missões baseadas nas linguagens de amor reais dele(a).</p>
                     <button onClick={() => setActiveTab('connection')} className="w-full max-w-md bg-slate-900 p-8 rounded-[2.5rem] hover:bg-black transition-all text-white font-black text-2xl uppercase tracking-tighter flex items-center justify-center gap-4 shadow-2xl">Conectar Agora <UserPlus className="w-6 h-6" /></button>
                   </div>
@@ -658,7 +703,7 @@ const App: React.FC = () => {
       {!user.hasFinishedTutorial && <Tutorial onComplete={() => setUser(p => ({ ...p, hasFinishedTutorial: true }))} />}
       <header className="sticky top-0 z-[60] bg-white/70 backdrop-blur-2xl border-b border-rose-100/50 h-20 flex items-center">
         <div className="max-w-7xl w-full mx-auto px-6 flex items-center justify-between">
-          <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
+          <div className="flex items-center gap-4 cursor-point" onClick={() => setActiveTab('dashboard')}>
             <div className="w-12 h-12 bg-rose-600 rounded-[1.2rem] flex items-center justify-center shadow-xl"><Heart className="w-7 h-7 text-white fill-white" /></div>
             <div className="hidden sm:block">
               <h1 className="text-xl font-black text-rose-950 leading-none tracking-tighter italic">AMOR EM AÇÃO</h1>

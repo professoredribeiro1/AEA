@@ -96,7 +96,7 @@ const GratitudeJournal: React.FC<GratitudeJournalProps> = ({ entries, onAddEntry
             <button
               type="submit"
               disabled={!text.trim()}
-              className="w-full md:w-auto px-10 py-5 bg-rose-900 text-white rounded-2xl font-black text-sm hover:bg-black transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-30"
+              className="w-full md:w-auto px-10 py-5 bg-rose-900 text-white rounded-2xl font-black text-sm hover:bg-black transition-all shadow-xl mt-6 disabled:opacity-30 flex items-center justify-center gap-3"
             >
               Registrar Momento <Sparkles className="w-4 h-4 fill-current" />
             </button>

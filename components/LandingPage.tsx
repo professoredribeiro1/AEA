@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Heart, ShieldCheck, Sparkles, Star, ChevronRight, Lock, User, Mail, Zap } from 'lucide-react';
 import { supabase } from '../services/supabase';
@@ -349,13 +350,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {[
-              { img: '/testimonials/testimonial_couple_1_1772570201993.png', name: 'Mariana & Thiago', time: 'Casados há 5 anos', text: 'Nós estávamos vivendo no automático. O aplicativo nos trouxe de volta aquela faísca do início do namoro. As missões ajudam muito!' },
-              { img: '/testimonials/testimonial_couple_2_1772570217077.png', name: 'Roberto & Sônia', time: 'Casados há 28 anos', text: 'Eu achava que depois de tanto tempo, não havia mais o que inovar. Estava errado. O check-up nos ajudou a entender várias coisas.' },
-              { img: '/testimonials/testimonial_couple_3_1772570230024.png', name: 'Carol & Bruno', time: 'Casados há 2 anos', text: 'Começamos a usar logo depois do casamento. É como ter um conselheiro no bolso nos ajudando a blindar nossa relação desde o primeiro dia.' }
+              { img: 'https://picsum.photos/seed/couple1/400/400', name: 'Mariana & Thiago', time: 'Casados há 5 anos', text: 'Nós estávamos vivendo no automático. O aplicativo nos trouxe de volta aquela faísca do início do namoro. As missões ajudam muito!' },
+              { img: 'https://picsum.photos/seed/couple2/400/400', name: 'Roberto & Sônia', time: 'Casados há 28 anos', text: 'Eu achava que depois de tanto tempo, não havia mais o que inovar. Estava errado. O check-up nos ajudou a entender várias coisas.' },
+              { img: 'https://picsum.photos/seed/couple3/400/400', name: 'Carol & Bruno', time: 'Casados há 2 anos', text: 'Começamos a usar logo depois do casamento. É como ter um conselheiro no bolso nos ajudando a blindar nossa relação desde o primeiro dia.' }
             ].map((test, i) => (
               <div key={i} className="bg-white p-8 rounded-3xl border border-slate-100 shadow-xl shadow-slate-200/50 space-y-6 relative flex flex-col items-center text-center mt-12">
                 <div className="absolute -top-12 w-24 h-24 rounded-full border-4 border-white shadow-lg overflow-hidden bg-rose-100">
-                  <img src={test.img} alt={test.name} className="w-full h-full object-cover" />
+                  <img src={test.img} alt={test.name} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-500" referrerPolicy="no-referrer" />
                 </div>
                 <div className="pt-8">
                   <div className="flex gap-1 justify-center mb-4">
@@ -464,10 +465,10 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
                 <button
                   onClick={() => window.location.href = plan.checkoutUrl}
                   className={`w-full py-6 rounded-[2rem] font-black text-lg transition-all ${plan.id === 'quarterly'
-                    ? 'bg-rose-600 text-white shadow-xl shadow-rose-200 hover:bg-rose-700'
-                    : plan.id === 'annual'
-                      ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-100 hover:bg-emerald-700'
-                      : 'bg-slate-100 text-slate-900 hover:bg-slate-200'
+                      ? 'bg-rose-600 text-white shadow-xl shadow-rose-200 hover:bg-rose-700'
+                      : plan.id === 'annual'
+                        ? 'bg-emerald-600 text-white shadow-xl shadow-emerald-100 hover:bg-emerald-700'
+                        : 'bg-slate-100 text-slate-900 hover:bg-slate-200'
                     }`}
                 >
                   Selecionar Plano
