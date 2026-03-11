@@ -2,34 +2,41 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { LoveLanguage, Mission } from "../types";
 
+/**
+ * Robustly retrieves the Gemini API Key from multiple possible environment sources.
+ * In Vite/Vercel, we prioritize VITE_ prefixed variables.
+ */
 const getApiKey = () => {
-  // Try all possible ways to get the key
-  const key = 
-    (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || 
-    (import.meta.env && import.meta.env.VITE_API_KEY) ||
-    (typeof process !== 'undefined' && process.env && process.env.VITE_GEMINI_API_KEY) ||
-    (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) ||
-    '';
-    
-  if (!key) {
-    console.warn("⚠️ Chave de API (VITE_GEMINI_API_KEY) não encontrada no ambiente.");
+  // Try to get from import.meta.env (Vite standard)
+  const viteKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY;
+  if (viteKey && viteKey !== 'undefined' && viteKey !== 'null') return viteKey;
+
+  // Fallback to process.env (Node/Build-time standard)
+  if (typeof process !== 'undefined' && process.env) {
+    const procKey = process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    if (procKey && procKey !== 'undefined' && procKey !== 'null') return procKey;
   }
-  return key;
+
+  return '';
 };
 
-let aiInstance: GoogleGenAI | null = null;
-
-const getAi = () => {
-  if (!aiInstance) {
-    const key = getApiKey();
-    if (key) {
-      console.log("✅ Inicializando GoogleGenAI com a chave encontrada.");
-      aiInstance = new GoogleGenAI({ apiKey: key });
-    } else {
-      console.error("❌ Falha ao inicializar GoogleGenAI: Chave ausente.");
-    }
+/**
+ * Creates a fresh instance of GoogleGenAI.
+ * Following guidelines to instantiate right before use to ensure latest key is used.
+ */
+const createAiClient = () => {
+  const key = getApiKey();
+  if (!key) {
+    console.error("❌ Erro: Chave de API Gemini não encontrada. Verifique as variáveis de ambiente (VITE_GEMINI_API_KEY).");
+    return null;
   }
-  return aiInstance;
+  
+  try {
+    return new GoogleGenAI({ apiKey: key });
+  } catch (err) {
+    console.error("❌ Erro ao instanciar GoogleGenAI:", err);
+    return null;
+  }
 };
 
 export const generateDailyMission = async (
@@ -40,11 +47,10 @@ export const generateDailyMission = async (
   isLighter: boolean = false,
   rejectedDescriptions: string[] = []
 ): Promise<Partial<Mission>> => {
-  const ai = getAi();
-  if (!ai) return { title: 'Missão Indisponível', description: 'O serviço de IA não está configurado. Verifique as configurações de API.', rationale: '' };
+  const ai = createAiClient();
+  if (!ai) return { title: 'Configuração Pendente', description: 'Por favor, configure sua chave de API Gemini nas variáveis de ambiente.', rationale: '' };
 
   if (!targetLanguage || !targetName) {
-    console.error("❌ Parâmetros ausentes para gerar missão:", { targetLanguage, targetName });
     return { title: 'Dados Incompletos', description: 'Certifique-se de que as linguagens do amor do parceiro estão configuradas.', rationale: '' };
   }
 
@@ -94,7 +100,6 @@ export const generateDailyMission = async (
         }
       }
     });
-    // Fix: Use trim() to clean the response text before parsing JSON
     return JSON.parse(response.text?.trim() || '{}');
   } catch (error) {
     console.error("❌ Erro ao gerar missão diária:", error);
@@ -107,39 +112,43 @@ export const getMissionCompletionFeedback = async (
   partnerName: string, 
   userRelato: string
 ): Promise<{ feedback: string, impact: number, success: boolean }> => {
-  const ai = getAi();
+  const ai = createAiClient();
   if (!ai) return { feedback: "IA não configurada", impact: 0, success: false };
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `Missão: "${mission.title}". 
-    O que foi pedido: "${mission.description}".
-    Relato do usuário: "${userRelato}". 
-    Avalie o cumprimento desta pequena meta diária para ${partnerName}.`,
-    config: {
-      systemInstruction: `Analise o relato de cumprimento.
-      - Valorize a consistência e a intenção, não a grandiosidade.
-      - Se o usuário descreveu o que fez com sinceridade, success é true.
-      - Ofereça um feedback encorajador que mostre como esse pequeno passo constrói uma relação inabalável.
-      - Impact: Atribua de 0.3 a 1.5 baseado no nível de conexão demonstrado no relato.`,
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          feedback: { type: Type.STRING },
-          impact: { type: Type.NUMBER },
-          success: { type: Type.BOOLEAN }
-        },
-        required: ["feedback", "impact", "success"]
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Missão: "${mission.title}". 
+      O que foi pedido: "${mission.description}".
+      Relato do usuário: "${userRelato}". 
+      Avalie o cumprimento desta pequena meta diária para ${partnerName}.`,
+      config: {
+        systemInstruction: `Analise o relato de cumprimento.
+        - Valorize a consistência e a intenção, não a grandiosidade.
+        - Se o usuário descreveu o que fez com sinceridade, success é true.
+        - Ofereça um feedback encorajador que mostre como esse pequeno passo constrói uma relação inabalável.
+        - Impact: Atribua de 0.3 a 1.5 baseado no nível de conexão demonstrado no relato.`,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            feedback: { type: Type.STRING },
+            impact: { type: Type.NUMBER },
+            success: { type: Type.BOOLEAN }
+          },
+          required: ["feedback", "impact", "success"]
+        }
       }
-    }
-  });
-  // Fix: Use trim() to clean the response text before parsing JSON
-  return JSON.parse(response.text?.trim() || '{"feedback": "Erro no feedback", "impact": 0, "success": false}');
+    });
+    return JSON.parse(response.text?.trim() || '{"feedback": "Erro no feedback", "impact": 0, "success": false}');
+  } catch (error) {
+    console.error("❌ Erro ao validar missão:", error);
+    return { feedback: "Erro ao processar feedback", impact: 0, success: false };
+  }
 };
 
 export const getCoachAdvice = async (history: {role: string, parts: {text: string}[]}[], userMessage: string): Promise<string> => {
-  const ai = getAi();
+  const ai = createAiClient();
   if (!ai) return "O Conselheiro Pastoral está offline no momento. Verifique a configuração da API.";
 
   try {
@@ -158,7 +167,6 @@ export const getCoachAdvice = async (history: {role: string, parts: {text: strin
         topP: 0.95,
       }
     });
-    // Fix: Ensure we return an empty string if text is undefined
     return response.text || '';
   } catch (error) {
     console.error("❌ Erro no Conselheiro Pastoral:", error);

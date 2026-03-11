@@ -1,19 +1,19 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { LoveLanguage, UserProfile, Challenge, Mission, SubscriptionInfo, Message, TankTheme, GratitudeEntry } from './types';
-import { fetchMyProfile, fetchPartnerProfile, linkWithPartner, updateTankLevel, updateLanguages, updateChallenge, ensureCoupleCode } from './services/profileService';
+import { fetchMyProfile, fetchPartnerProfile, linkWithPartner, updateTankLevel, updateLanguages, updateChallenge, ensureCoupleCode } from './services/profile-service';
 import { LANGUAGE_METADATA } from './constants';
 import TankGauge from './components/TankGauge';
 import Quiz from './components/Quiz';
 import Tutorial from './components/Tutorial';
 import PersonalCoach from './components/PersonalCoach';
 import NotificationManager from './components/NotificationManager';
-import { useNotificationLogic } from './hooks/useNotificationLogic';
+import { useNotificationLogic } from './hooks/use-notification-logic';
 import CoupleConnection from './components/CoupleConnection';
 import MyChallenges from './components/MyChallenges';
 import GratitudeJournal from './components/GratitudeJournal';
 import LandingPage from './components/LandingPage';
-import { generateDailyMission, getMissionCompletionFeedback } from './services/geminiService';
+import { generateDailyMission, getMissionCompletionFeedback } from './services/gemini-service';
 import { supabase } from './services/supabase';
 import { 
   Heart, Sparkles, Calendar, Trophy, 

@@ -1,9 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 
 const getEnvVar = (name: string) => {
-    return (import.meta.env && import.meta.env[name]) || 
-           (typeof process !== 'undefined' && process.env && process.env[name]) || 
-           '';
+    const value = (import.meta.env && import.meta.env[name]) || 
+                 (typeof process !== 'undefined' && process.env && process.env[name]) || 
+                 '';
+    return (value === 'undefined' || value === 'null') ? '' : value;
 };
 
 const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
