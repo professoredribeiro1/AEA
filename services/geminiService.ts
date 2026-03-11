@@ -2,7 +2,21 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { LoveLanguage, Mission } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getApiKey = () => {
+  return process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+};
+
+let aiInstance: GoogleGenAI | null = null;
+
+const getAi = () => {
+  if (!aiInstance) {
+    const key = getApiKey();
+    if (key) {
+      aiInstance = new GoogleGenAI({ apiKey: key });
+    }
+  }
+  return aiInstance;
+};
 
 export const generateDailyMission = async (
   targetLanguage: LoveLanguage, 
@@ -12,6 +26,9 @@ export const generateDailyMission = async (
   isLighter: boolean = false,
   rejectedDescriptions: string[] = []
 ): Promise<Partial<Mission>> => {
+  const ai = getAi();
+  if (!ai) return { title: 'Missão Indisponível', description: 'O serviço de IA não está configurado.', rationale: '' };
+
   const themes = [
     "Fundação e Reconexão Básica",
     "Intimidade e Vulnerabilidade",
@@ -66,6 +83,9 @@ export const getMissionCompletionFeedback = async (
   partnerName: string, 
   userRelato: string
 ): Promise<{ feedback: string, impact: number, success: boolean }> => {
+  const ai = getAi();
+  if (!ai) return { feedback: "IA não configurada", impact: 0, success: false };
+
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Missão: "${mission.title}". 
@@ -95,6 +115,9 @@ export const getMissionCompletionFeedback = async (
 };
 
 export const getCoachAdvice = async (history: {role: string, parts: {text: string}[]}[], userMessage: string): Promise<string> => {
+  const ai = getAi();
+  if (!ai) return "O Conselheiro Pastoral está offline no momento. Verifique a configuração da API.";
+
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
     contents: [...history, { role: 'user', parts: [{ text: userMessage }] }],

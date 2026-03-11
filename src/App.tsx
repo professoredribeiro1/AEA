@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LoveLanguage, UserProfile, Challenge, Mission, SubscriptionInfo, Message, TankTheme, GratitudeEntry } from './types';
 import { fetchMyProfile, fetchPartnerProfile, linkWithPartner, updateTankLevel, updateLanguages, updateChallenge, ensureCoupleCode } from './services/profileService';
-import { LANGUAGE_METADATA } from './constants.tsx';
+import { LANGUAGE_METADATA } from './constants';
 import TankGauge from './components/TankGauge';
 import Quiz from './components/Quiz';
 import Tutorial from './components/Tutorial';
@@ -482,8 +482,8 @@ const App: React.FC = () => {
     return <LandingPage onLogin={handleLogin} />;
   }
 
-  // Verificar se o usuário tem assinatura ativa ('active' ou 'trialing')
-  const hasActiveSubscription = user.subscription?.status === 'active' || user.subscription?.status === 'trialing';
+  // Verificar se o usuário tem assinatura ativa ('active', 'trialing' ou 'trial')
+  const hasActiveSubscription = user.subscription?.status === 'active' || user.subscription?.status === 'trialing' || user.subscription?.status === 'trial';
 
   if (!hasActiveSubscription) {
     return (
