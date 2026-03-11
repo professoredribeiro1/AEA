@@ -21,14 +21,22 @@ import {
 } from 'lucide-react';
 
 const App: React.FC = () => {
+  console.log("📱 Renderizando App component");
   const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
   const emptyChallenge: Challenge = { type: null, startDate: null, missions: [], cycleCount: 1 };
   
   const getInitialSubscription = (): SubscriptionInfo => {
-    const saved = localStorage.getItem('love_user_v4');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed.subscription) return parsed.subscription;
+    try {
+      const saved = localStorage.getItem('love_user_v4');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.subscription) {
+          console.log("✅ Assinatura carregada do localStorage");
+          return parsed.subscription;
+        }
+      }
+    } catch (e) {
+      console.error("❌ Erro ao parsear assinatura do localStorage:", e);
     }
     return { status: 'trial', plan: 'none', trialStartedAt: new Date().toISOString(), expiresAt: null };
   };
@@ -37,8 +45,16 @@ const App: React.FC = () => {
   const [sessionLoading, setSessionLoading] = useState(true);
 
   const [user, setUser] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('love_user_v4');
-    return saved ? JSON.parse(saved) : { 
+    try {
+      const saved = localStorage.getItem('love_user_v4');
+      if (saved) {
+        console.log("✅ Usuário carregado do localStorage");
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error("❌ Erro ao parsear usuário do localStorage:", e);
+    }
+    return { 
       name: '', languages: [], tankLevel: 5, challenge: emptyChallenge,
       hasFinishedTutorial: false, subscription: getInitialSubscription(), notificationsEnabled: false,
       soundEnabled: true,
@@ -48,8 +64,16 @@ const App: React.FC = () => {
   });
 
   const [partner, setPartner] = useState<UserProfile>(() => {
-    const saved = localStorage.getItem('love_partner_v4');
-    return saved ? JSON.parse(saved) : { 
+    try {
+      const saved = localStorage.getItem('love_partner_v4');
+      if (saved) {
+        console.log("✅ Parceiro carregado do localStorage");
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error("❌ Erro ao parsear parceiro do localStorage:", e);
+    }
+    return { 
       name: 'Parceiro(a)', languages: [], tankLevel: 5, challenge: emptyChallenge,
       hasFinishedTutorial: true, subscription: getInitialSubscription(), notificationsEnabled: false,
       soundEnabled: true,
@@ -122,7 +146,9 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
+    console.log("🔌 Iniciando useEffect de Autenticação");
     if (!supabase) {
+      console.warn("⚠️ Supabase não inicializado");
       setSessionLoading(false);
       setLoadingProfile(false);
       return;
@@ -466,6 +492,8 @@ const App: React.FC = () => {
       alert("Erro ao conectar. Tente novamente.");
     }
   };
+
+  console.log("📊 App States:", { sessionLoading, isAuthenticated, loadingProfile, userId: supabaseUserId });
 
   if (sessionLoading || (isAuthenticated && loadingProfile)) {
     return (
