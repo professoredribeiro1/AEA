@@ -3,9 +3,16 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { LoveLanguage, Mission } from "../types";
 
 const getApiKey = () => {
-  const key = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+  // Try all possible ways to get the key
+  const key = 
+    (import.meta.env && import.meta.env.VITE_GEMINI_API_KEY) || 
+    (import.meta.env && import.meta.env.VITE_API_KEY) ||
+    (typeof process !== 'undefined' && process.env && process.env.VITE_GEMINI_API_KEY) ||
+    (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) ||
+    '';
+    
   if (!key) {
-    console.warn("⚠️ GEMINI_API_KEY não encontrada no ambiente.");
+    console.warn("⚠️ Chave de API (VITE_GEMINI_API_KEY) não encontrada no ambiente.");
   }
   return key;
 };
