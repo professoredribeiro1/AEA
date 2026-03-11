@@ -69,6 +69,12 @@ const App: React.FC = () => {
 
   // WebSocket for real-time tank sync (fallback/complement to Supabase Realtime)
   useEffect(() => {
+    // Disable WebSocket in production (Vercel) as it doesn't support persistent WS
+    if (window.location.hostname.includes('vercel.app')) {
+      console.log("WebSocket disabled in production environment.");
+      return;
+    }
+
     let ws: WebSocket;
     let reconnectTimer: any;
 
