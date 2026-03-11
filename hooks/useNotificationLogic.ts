@@ -20,13 +20,44 @@ export const useNotificationLogic = ({ user, partner, onToggleNotifications }: U
   const lastNotificationRef = useRef<string | null>(localStorage.getItem('last_notification_key'));
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  const hasInteractedRef = useRef(false);
+
   useEffect(() => {
     audioRef.current = new Audio(NOTIFICATION_SOUND_URL);
+    
+    const handleInteraction = () => {
+      hasInteractedRef.current = true;
+      // Opcional: tocar um som silencioso para "desbloquear" o áudio no iOS/Safari
+      if (audioRef.current) {
+        audioRef.current.volume = 0;
+        audioRef.current.play().then(() => {
+          audioRef.current?.pause();
+          if (audioRef.current) audioRef.current.volume = 1;
+        }).catch(() => {});
+      }
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
+
+    window.addEventListener('click', handleInteraction);
+    window.addEventListener('keydown', handleInteraction);
+    window.addEventListener('touchstart', handleInteraction);
+
+    return () => {
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
   }, []);
 
   const playSound = () => {
-    if (user.soundEnabled && audioRef.current) {
-      audioRef.current.play().catch(e => console.error("Erro ao tocar som:", e));
+    if (user.soundEnabled && audioRef.current && hasInteractedRef.current) {
+      audioRef.current.play().catch(e => {
+        if (e.name !== 'NotAllowedError') {
+          console.error("Erro ao tocar som:", e);
+        }
+      });
     }
   };
 

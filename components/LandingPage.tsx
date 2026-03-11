@@ -131,6 +131,9 @@ const LandingPage: React.FC<LandingPageProps> = ({ onLogin }) => {
               setLoading(true);
 
               try {
+                if (!supabase) {
+                  throw new Error('O serviço de autenticação não está configurado. Verifique as variáveis de ambiente.');
+                }
                 if (isSignUp) {
                   const { data, error } = await supabase.auth.signUp({
                     email,

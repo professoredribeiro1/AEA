@@ -116,6 +116,12 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
+    if (!supabase) {
+      setSessionLoading(false);
+      setLoadingProfile(false);
+      return;
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsAuthenticated(!!session);
       if (session?.user) {

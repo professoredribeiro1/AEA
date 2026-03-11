@@ -18,6 +18,7 @@ export interface SupabaseProfile {
  * Gera um código de casal único e salva no perfil do usuário ao criar conta.
  */
 export const ensureCoupleCode = async (userId: string): Promise<string> => {
+    if (!supabase) return '';
     // Verificar se já tem código
     const { data } = await supabase.from('profiles').select('couple_code').eq('id', userId).single();
     if (data?.couple_code) return data.couple_code;
@@ -32,6 +33,7 @@ export const ensureCoupleCode = async (userId: string): Promise<string> => {
  * Busca o perfil completo do usuário logado.
  */
 export const fetchMyProfile = async (userId: string): Promise<SupabaseProfile | null> => {
+    if (!supabase) return null;
     const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, tank_level, languages, couple_code, partner_id, challenge, plan_type, subscription_status, expires_at')
@@ -46,6 +48,7 @@ export const fetchMyProfile = async (userId: string): Promise<SupabaseProfile | 
  * Busca perfil do parceiro pelo partner_id.
  */
 export const fetchPartnerProfile = async (partnerId: string): Promise<SupabaseProfile | null> => {
+    if (!supabase) return null;
     const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, tank_level, languages, couple_code, partner_id, challenge, plan_type, subscription_status, expires_at')
@@ -61,6 +64,7 @@ export const fetchPartnerProfile = async (partnerId: string): Promise<SupabasePr
  * Retorna o perfil do parceiro se encontrado, ou null.
  */
 export const linkWithPartner = async (myUserId: string, partnerCode: string): Promise<SupabaseProfile | null> => {
+    if (!supabase) return null;
     const { data, error } = await supabase.rpc('link_partners', {
         my_user_id: myUserId,
         p_code: partnerCode.toUpperCase().trim()
@@ -78,6 +82,7 @@ export const linkWithPartner = async (myUserId: string, partnerCode: string): Pr
  * Atualiza o nível do termômetro do usuário no banco.
  */
 export const updateTankLevel = async (userId: string, level: number): Promise<void> => {
+    if (!supabase) return;
     await supabase.from('profiles').update({ tank_level: level }).eq('id', userId);
 };
 
@@ -85,6 +90,7 @@ export const updateTankLevel = async (userId: string, level: number): Promise<vo
  * Salva as linguagens do amor do usuário no banco.
  */
 export const updateLanguages = async (userId: string, languages: LoveLanguage[]): Promise<void> => {
+    if (!supabase) return;
     await supabase.from('profiles').update({ languages }).eq('id', userId);
 };
 
@@ -92,5 +98,6 @@ export const updateLanguages = async (userId: string, languages: LoveLanguage[])
  * Salva o estado do desafio do usuário.
  */
 export const updateChallenge = async (userId: string, challenge: Challenge): Promise<void> => {
+    if (!supabase) return;
     await supabase.from('profiles').update({ challenge }).eq('id', userId);
 };
