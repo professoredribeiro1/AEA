@@ -8,7 +8,7 @@ import { LoveLanguage, Mission } from "../types";
  * even if environment variables are not immediately available.
  */
 const getApiKey = () => {
-  // Tenta pegar do Vercel/Vite
+  // Pega estritamente do Vercel/Vite
   const envKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
   const processKey = (window as any).process?.env?.VITE_GEMINI_API_KEY;
   
@@ -18,8 +18,7 @@ const getApiKey = () => {
     return key.trim();
   }
 
-  // Sua chave nova oficial (final BuWE)
-  return 'AIzaSyDDCjoR8XFmJsNPwNpnm56PXVn24FlBuWE';
+  return ""; // Retorna vazio se não houver chave segura configurada
 };
 
 const createAiClient = () => {
