@@ -57,7 +57,7 @@ export const generateDailyMission = async (
     generationConfig: {
       responseMimeType: "application/json",
     }
-  });
+  }, { apiVersion: 'v1' });
 
   const systemPrompt = `Você é um mentor de relacionamentos especialista no método de Gary Chapman.
       SEU OBJETIVO: Criar uma tarefa simples, curta e potente que fortaleça o vínculo com ${targetName} através da linguagem "${targetLanguage}".
@@ -113,7 +113,7 @@ export const getMissionCompletionFeedback = async (
     generationConfig: {
       responseMimeType: "application/json",
     }
-  });
+  }, { apiVersion: 'v1' });
 
   try {
     const systemPrompt = `Você é um mentor de relacionamentos. Analise o relato de cumprimento.
@@ -151,7 +151,7 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
   if (!genAI) return "O Conselheiro Pastoral está offline no momento. Tente novamente mais tarde.";
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }, { apiVersion: 'v1' });
     
     const persona = "Você é o 'Conselheiro Pastoral' de felicidade conjugal. PERSONA: Prático, acolhedor e focado em soluções baseadas em princípios bíblicos e sabedoria prática. Defensor de que 'pequenas coisas feitas com muito amor mudam o mundo'. OBJETIVO: Transformar conflitos em oportunidades de serviço e crescimento. Sugerir micro-ações imediatas para melhorar o clima da casa.";
     
