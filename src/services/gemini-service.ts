@@ -181,10 +181,10 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
   } catch (error: any) {
     console.error("❌ Erro no Conselheiro Pastoral:", error);
     
-    // Se for erro 404 (modelo não encontrado), tenta o gemini-pro como fallback
+    // Se for erro 404 (modelo não encontrado), tenta os nomes mais genéricos ou versões pro
     if (error?.message?.includes('404') || error?.message?.includes('not found')) {
       try {
-        const modelFallback = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const modelFallback = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
         const result = await modelFallback.generateContent(userMessage);
         return result.response.text();
       } catch (e) {
