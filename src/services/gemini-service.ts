@@ -8,13 +8,13 @@ import { LoveLanguage, Mission } from "../types";
  * even if environment variables are not immediately available.
  */
 const getApiKey = () => {
-  // Pega a chave e remove qualquer espaço em branco acidental (muito comum no Vercel/Vite)
+  // Pega a chave e remove qualquer espaço em branco acidental
   const key = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
               (window as any).process?.env?.VITE_GEMINI_API_KEY;
               
   const finalKey = (key && key !== 'undefined' && key !== 'null') 
     ? key 
-    : 'AIzaSyDlgHHkSZVCZpzO2jes54RJ6dnCXqjdIIg';
+    : 'AIzaSyBpRdN0AEZR1ior8p9UP6mOr_vtrhsKLfQ';
 
   return finalKey.trim();
 };
