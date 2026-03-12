@@ -15,7 +15,6 @@ const getApiKey = () => {
   const key = envKey || processKey;
               
   if (key && key !== 'undefined' && key !== 'null' && key.length > 20) {
-    console.log("✅ Key loaded.");
     return key.trim();
   }
 
