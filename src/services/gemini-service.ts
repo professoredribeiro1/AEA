@@ -8,14 +8,15 @@ import { LoveLanguage, Mission } from "../types";
  * even if environment variables are not immediately available.
  */
 const getApiKey = () => {
-  // Tenta pegar de várias formas possíveis para garantir compatibilidade
+  // Pega a chave e remove qualquer espaço em branco acidental (muito comum no Vercel/Vite)
   const key = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
               (window as any).process?.env?.VITE_GEMINI_API_KEY;
               
-  if (key && key !== 'undefined' && key !== 'null') return key;
+  const finalKey = (key && key !== 'undefined' && key !== 'null') 
+    ? key 
+    : 'AIzaSyDlgHHkSZVCZpzO2jes54RJ6dnCXqjdIIg';
 
-  // Fallback key final
-  return 'AIzaSyDlgHHkSZVCZpzO2jes54RJ6dnCXqjdIIg';
+  return finalKey.trim();
 };
 
 const createAiClient = () => {
@@ -48,9 +49,9 @@ export const generateDailyMission = async (
   ];
   const currentTheme = themes[(cycleNumber - 1) % themes.length];
 
-  // Tenta usar gemini-1.5-flash-latest para evitar erros de versão regional
+  // Usamos explicitamente gemini-1.5-flash na versão v1 para máxima compatibilidade
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash-latest", 
+    model: "gemini-1.5-flash", 
     generationConfig: {
       responseMimeType: "application/json",
     },
@@ -60,7 +61,7 @@ export const generateDailyMission = async (
         text: `Você é um mentor de relacionamentos especialista no método de Gary Chapman.
       SEU OBJETIVO: Criar uma tarefa simples, curta e potente que fortaleça o vínculo com ${targetName} através da linguagem "${targetLanguage}".
       
-      ${isLighter ? 'REQUISITO ESPECIAL: Esta missão deve ser EXTREMAMENTE LEVE, PASSIVA e TOTALMENTE DIFERENTE da missão anterior. Ela deve ser focada em pequenos gestos que não exijam quase nenhum esforço emocional ou interação direta obrigatória.' : ''}
+      ${isLighter ? 'REQUISITO ESPECIAL: Esta missão deve ser EXTREMAMENTE LEVE, PASSIVA e TOTALMENTE DIFERENTE da missão anterior. Ela deve ser focada em pequenos gestos que não exijam quase nenhum esforço emocional ou interação direta obrigatórria.' : ''}
 
       CONTEXTO DO CICLO:
       Estamos no Ciclo ${cycleNumber} com o tema "${currentTheme}". 
@@ -78,7 +79,7 @@ export const generateDailyMission = async (
         "rationale": "Por que isso é poderoso para quem fala ${targetLanguage}"
       }` }]
     }
-  });
+  }, { apiVersion: 'v1' });
 
   const prompt = `Gere uma missão prática de "Amor Sacrificial" ${isLighter ? 'LEVE E SUAVE ' : ''}para o dia ${dayNumber} do Ciclo ${cycleNumber} (Tema: ${currentTheme}). O alvo é "${targetName}" e sua linguagem do amor predominante é "${targetLanguage}".
     ${rejectedDescriptions.length > 0 ? `EVITE as seguintes ideias ou descrições que já foram recusadas: ${rejectedDescriptions.join('; ')}` : ''}`;
@@ -141,6 +142,7 @@ export const getMissionCompletionFeedback = async (
       contents: [{ role: 'user', parts: [{ text: prompt }] }]
     });
 
+    console.log("✅ Missão validada com sucesso via Gemini");
     return JSON.parse(result.response.text());
   } catch (error) {
     console.error("❌ Erro ao validar missão:", error);
@@ -154,12 +156,12 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash-latest", 
+      model: "gemini-1.5-flash", 
       systemInstruction: {
         role: 'system',
         parts: [{ text: "Você é o 'Conselheiro Pastoral' de felicidade conjugal. PERSONA: Prático, acolhedor e focado em soluções baseadas em princípios bíblicos e sabedoria prática. Defensor de que 'pequenas coisas feitas com muito amor mudam o mundo'. OBJETIVO: Transformar conflitos em oportunidades de serviço e crescimento. Sugerir micro-ações imediatas para melhorar o clima da casa." }]
       }
-    });
+    }, { apiVersion: 'v1' });
 
     // O Gemini exige que o histórico comece com 'user'. 
     // Se a primeira mensagem for 'model', nós a removemos do histórico enviado.
