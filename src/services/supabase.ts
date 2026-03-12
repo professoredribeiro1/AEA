@@ -1,15 +1,24 @@
+
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || (typeof process !== 'undefined' ? (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) : '');
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || (typeof process !== 'undefined' ? (process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY) : '');
+const getEnvVar = (name: string) => {
+    const value = (import.meta.env && import.meta.env[name]) ||
+        (typeof process !== 'undefined' && process.env && process.env[name]) ||
+        '';
+    return (value === 'undefined' || value === 'null') ? '' : value;
+};
+
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
 
 if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('CRITICAL: Missing Supabase environment variables! Check if VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in Vercel.');
+    console.error('🚨 ERRO DE CONFIGURAÇÃO: As chaves do Supabase não foram encontradas. Verifique as variáveis de ambiente VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.');
 }
 
-// Use a placeholder if variables are missing to avoid top-level crash, but log a clear error.
-const placeholderUrl = 'https://missing-project-url.supabase.co';
-const placeholderKey = 'missing-anon-key';
+// Usamos um placeholder se as variáveis estiverem ausentes para evitar crash imediato no import,
+// mas o cliente não funcionará. Registramos o erro acima.
+const placeholderUrl = 'https://pyuivdaujlynvjmtjzjb.supabase.co';
+const placeholderKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9';
 
 export const supabase = createClient(
     supabaseUrl || placeholderUrl,
