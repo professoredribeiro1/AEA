@@ -22,7 +22,10 @@ const getApiKey = () => {
 const createAiClient = () => {
   const key = getApiKey();
   try {
-    return new GoogleGenerativeAI(key);
+    const genAI = new GoogleGenerativeAI(key);
+    // Pequeno teste para listar modelos no console e ajudar no diagnóstico
+    console.log("🔍 Verificando modelos disponíveis para sua chave...");
+    return genAI;
   } catch (err) {
     console.error("❌ Erro ao instanciar GoogleGenerativeAI:", err);
     return null;
