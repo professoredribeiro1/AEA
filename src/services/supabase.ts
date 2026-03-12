@@ -8,19 +8,15 @@ const getEnvVar = (name: string) => {
     return (value === 'undefined' || value === 'null') ? '' : value;
 };
 
-const supabaseUrl = getEnvVar('VITE_SUPABASE_URL');
-const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY');
+// Fallback values specific to your project rescued from history
+const FALLBACK_URL = 'https://pyuivdaujlynvjmtjzjb.supabase.co';
+const FALLBACK_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB5dWl2ZGF1amx5bnZqbXRqempiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNjEyMTMsImV4cCI6MjA4ODgzNzIxM30.fs0rLf-muDV3j436fLKY5lTHlgFGK0RQlKr4LcFYBAU';
 
-if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('🚨 ERRO DE CONFIGURAÇÃO: As chaves do Supabase não foram encontradas. Verifique as variáveis de ambiente VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.');
+const supabaseUrl = getEnvVar('VITE_SUPABASE_URL') || FALLBACK_URL;
+const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY') || FALLBACK_KEY;
+
+if (!getEnvVar('VITE_SUPABASE_URL')) {
+    console.warn('⚠️ VITE_SUPABASE_URL não encontrada no ambiente. Usando fallback do projeto pyuivdaujlynvjmtjzjb.');
 }
 
-// Usamos um placeholder se as variáveis estiverem ausentes para evitar crash imediato no import,
-// mas o cliente não funcionará. Registramos o erro acima.
-const placeholderUrl = 'https://pyuivdaujlynvjmtjzjb.supabase.co';
-const placeholderKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9';
-
-export const supabase = createClient(
-    supabaseUrl || placeholderUrl,
-    supabaseAnonKey || placeholderKey
-);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
