@@ -48,8 +48,9 @@ export const generateDailyMission = async (
   ];
   const currentTheme = themes[(cycleNumber - 1) % themes.length];
 
+  // Tenta usar gemini-1.5-flash, se falhar o 404, o catch cuidará de retornar o erro amigável ou tentar outro modelo
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash",
+    model: "gemini-1.5-flash", 
     generationConfig: {
       responseMimeType: "application/json",
     },
@@ -153,7 +154,7 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
 
   try {
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
+      model: "gemini-1.5-flash", 
       systemInstruction: {
         role: 'system',
         parts: [{ text: "Você é o 'Conselheiro Pastoral' de felicidade conjugal. PERSONA: Prático, acolhedor e focado em soluções baseadas em princípios bíblicos e sabedoria prática. Defensor de que 'pequenas coisas feitas com muito amor mudam o mundo'. OBJETIVO: Transformar conflitos em oportunidades de serviço e crescimento. Sugerir micro-ações imediatas para melhorar o clima da casa." }]
@@ -177,12 +178,24 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
 
     const result = await chat.sendMessage(userMessage);
     return result.response.text();
-  } catch (error) {
+  } catch (error: any) {
     console.error("❌ Erro no Conselheiro Pastoral:", error);
-    // Tenta uma resposta simples sem histórico se o erro for de formato de histórico
+    
+    // Se for erro 404 (modelo não encontrado), tenta o gemini-pro como fallback
+    if (error?.message?.includes('404') || error?.message?.includes('not found')) {
+      try {
+        const modelFallback = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await modelFallback.generateContent(userMessage);
+        return result.response.text();
+      } catch (e) {
+        return "Desculpe, tive um problema técnico ao processar sua mensagem. Mas lembre-se: o amor sacrificial é o caminho. Tente perguntar novamente em instantes.";
+      }
+    }
+    
+    // Tenta uma resposta simples sem histórico para outros erros
     try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const simpleResult = await model.generateContent(userMessage);
+      const modelSimple = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const simpleResult = await modelSimple.generateContent(userMessage);
       return simpleResult.response.text();
     } catch (e) {
       return "Desculpe, tive um problema técnico ao processar sua mensagem. Mas lembre-se: o amor sacrificial é o caminho. Tente perguntar novamente em instantes.";
