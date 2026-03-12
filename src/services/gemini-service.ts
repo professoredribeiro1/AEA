@@ -8,14 +8,13 @@ import { LoveLanguage, Mission } from "../types";
  * even if environment variables are not immediately available.
  */
 const getApiKey = () => {
-  try {
-    const viteKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
-    if (viteKey && viteKey !== 'undefined' && viteKey !== 'null') return viteKey;
-  } catch (e) {
-    console.warn("⚠️ Não foi possível ler import.meta.env");
-  }
+  // Tenta pegar de várias formas possíveis para garantir compatibilidade
+  const key = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
+              (window as any).process?.env?.VITE_GEMINI_API_KEY;
+              
+  if (key && key !== 'undefined' && key !== 'null') return key;
 
-  // Fallback key specific to this project
+  // Fallback key final
   return 'AIzaSyDlgHHkSZVCZpzO2jes54RJ6dnCXqjdIIg';
 };
 
@@ -161,11 +160,16 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
       }
     });
 
-    // Filtra o histórico para garantir que está no formato correto
-    const formattedHistory = history.map(h => ({
+    // O Gemini exige que o histórico comece com 'user'. 
+    // Se a primeira mensagem for 'model', nós a removemos do histórico enviado.
+    let formattedHistory = history.map(h => ({
       role: h.role === 'model' ? 'model' : 'user',
       parts: h.parts
     }));
+
+    if (formattedHistory.length > 0 && formattedHistory[0].role === 'model') {
+      formattedHistory.shift();
+    }
 
     const chat = model.startChat({
       history: formattedHistory,
