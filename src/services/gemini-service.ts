@@ -52,16 +52,14 @@ export const generateDailyMission = async (
   ];
   const currentTheme = themes[(cycleNumber - 1) % themes.length];
 
-  // Usamos explicitamente gemini-1.5-flash na versão v1 para máxima compatibilidade
   const model = genAI.getGenerativeModel({ 
     model: "gemini-1.5-flash", 
     generationConfig: {
       responseMimeType: "application/json",
-    },
-    systemInstruction: {
-      role: 'system',
-      parts: [{
-        text: `Você é um mentor de relacionamentos especialista no método de Gary Chapman.
+    }
+  });
+
+  const systemPrompt = `Você é um mentor de relacionamentos especialista no método de Gary Chapman.
       SEU OBJETIVO: Criar uma tarefa simples, curta e potente que fortaleça o vínculo com ${targetName} através da linguagem "${targetLanguage}".
       
       ${isLighter ? 'REQUISITO ESPECIAL: Esta missão deve ser EXTREMAMENTE LEVE, PASSIVA e TOTALMENTE DIFERENTE da missão anterior. Ela deve ser focada em pequenos gestos que não exijam quase nenhum esforço emocional ou interação direta obrigatórria.' : ''}
@@ -80,11 +78,9 @@ export const generateDailyMission = async (
         "title": "Nome curto e acionável",
         "description": "Instrução passo a passo",
         "rationale": "Por que isso é poderoso para quem fala ${targetLanguage}"
-      }` }]
-    }
-  }, { apiVersion: 'v1' });
+      }`;
 
-  const prompt = `Gere uma missão prática de "Amor Sacrificial" ${isLighter ? 'LEVE E SUAVE ' : ''}para o dia ${dayNumber} do Ciclo ${cycleNumber} (Tema: ${currentTheme}). O alvo é "${targetName}" e sua linguagem do amor predominante é "${targetLanguage}".
+  const prompt = `${systemPrompt}\n\nQUESTÃO ATUAL: Gere uma missão prática de "Amor Sacrificial" ${isLighter ? 'LEVE E SUAVE ' : ''}para o dia ${dayNumber} do Ciclo ${cycleNumber} (Tema: ${currentTheme}). O alvo é "${targetName}" e sua linguagem do amor predominante é "${targetLanguage}".
     ${rejectedDescriptions.length > 0 ? `EVITE as seguintes ideias ou descrições que já foram recusadas: ${rejectedDescriptions.join('; ')}` : ''}`;
 
   try {
@@ -113,14 +109,14 @@ export const getMissionCompletionFeedback = async (
   if (!genAI) return { feedback: "IA offline", impact: 0, success: false };
 
   const model = genAI.getGenerativeModel({ 
-    model: "gemini-1.5-flash-latest",
+    model: "gemini-1.5-flash",
     generationConfig: {
       responseMimeType: "application/json",
-    },
-    systemInstruction: {
-      role: 'system',
-      parts: [{
-        text: `Analise o relato de cumprimento.
+    }
+  });
+
+  try {
+    const systemPrompt = `Você é um mentor de relacionamentos. Analise o relato de cumprimento.
       - Valorize a consistência e a intenção.
       - Se o usuário descreveu o que fez com sinceridade, success é true.
       - Ofereça um feedback encorajador.
@@ -131,12 +127,9 @@ export const getMissionCompletionFeedback = async (
         "feedback": "Texto encorajador",
         "impact": 0.5,
         "success": true
-      }` }]
-    }
-  });
+      }`;
 
-  try {
-    const prompt = `Missão: "${mission.title}". 
+    const prompt = `${systemPrompt}\n\nMissão: "${mission.title}". 
       O que foi pedido: "${mission.description}".
       Relato do usuário: "${userRelato}". 
       Avalie o cumprimento desta pequena meta diária para ${partnerName}.`;
@@ -158,13 +151,16 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
   if (!genAI) return "O Conselheiro Pastoral está offline no momento. Tente novamente mais tarde.";
 
   try {
-    // Usamos o modelo 'gemini-1.5-flash' que é o mais comum da versão v1
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     
-    // Inicia o chat sem histórico complicado para evitar erros de validação
+    const persona = "Você é o 'Conselheiro Pastoral' de felicidade conjugal. PERSONA: Prático, acolhedor e focado em soluções baseadas em princípios bíblicos e sabedoria prática. Defensor de que 'pequenas coisas feitas com muito amor mudam o mundo'. OBJETIVO: Transformar conflitos em oportunidades de serviço e crescimento. Sugerir micro-ações imediatas para melhorar o clima da casa.";
+    
+    // Inicia o chat sem sistemaInstruction para evitar erro 400
     const chat = model.startChat();
+    
+    const messageWithPersona = `INSTRUÇÃO DE PERSONA: ${persona}\n\nMENSAGEM DO USUÁRIO: ${userMessage}`;
 
-    const result = await chat.sendMessage(userMessage);
+    const result = await chat.sendMessage(messageWithPersona);
     return result.response.text();
   } catch (error: any) {
     console.error("❌ Erro no Conselheiro Pastoral:", error);
