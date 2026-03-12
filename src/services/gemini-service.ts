@@ -60,7 +60,7 @@ export const generateDailyMission = async (
   const currentTheme = themes[(cycleNumber - 1) % themes.length];
 
   const model = genAI.getGenerativeModel({ 
-    model: "models/gemini-1.5-flash", 
+    model: "models/gemini-2.0-flash", 
     generationConfig: {
       responseMimeType: "application/json",
     }
@@ -116,7 +116,7 @@ export const getMissionCompletionFeedback = async (
   if (!genAI) return { feedback: "IA offline", impact: 0, success: false };
 
   const model = genAI.getGenerativeModel({ 
-    model: "models/gemini-1.5-flash",
+    model: "models/gemini-2.0-flash",
     generationConfig: {
       responseMimeType: "application/json",
     }
@@ -158,7 +158,7 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
   if (!genAI) return "O Conselheiro Pastoral está offline no momento. Tente novamente mais tarde.";
 
   try {
-    const model = genAI.getGenerativeModel({ model: "models/gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "models/gemini-2.0-flash" });
     
     const persona = "Você é o 'Conselheiro Pastoral' de felicidade conjugal. PERSONA: Prático, acolhedor e focado em soluções baseadas em princípios bíblicos e sabedoria prática. Defensor de que 'pequenas coisas feitas com muito amor mudam o mundo'. OBJETIVO: Transformar conflitos em oportunidades de serviço e crescimento. Sugerir micro-ações imediatas para melhorar o clima da casa.";
     
@@ -174,9 +174,9 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
     
     // Se for erro 404 (modelo não encontrado), tenta os nomes mais genéricos ou versões pro
     if (error?.message?.includes('404') || error?.message?.includes('not found')) {
-      console.log("🔄 Tentando nomes alternativos de modelos...");
+      console.log("🔄 Tentando outros modelos da sua lista real...");
       try {
-        const fallbackModels = ["models/gemini-1.5-flash-latest", "models/gemini-pro", "models/gemini-1.5-pro"];
+        const fallbackModels = ["models/gemini-2.0-flash", "models/gemini-2.5-flash", "models/gemini-2.5-pro"];
         for (const modelName of fallbackModels) {
            try {
              const modelFallback = genAI.getGenerativeModel({ model: modelName });
