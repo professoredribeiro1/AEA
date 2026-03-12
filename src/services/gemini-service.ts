@@ -29,8 +29,13 @@ const createAiClient = () => {
   const key = getApiKey();
   try {
     const genAI = new GoogleGenerativeAI(key);
-    // Pequeno teste para listar modelos no console e ajudar no diagnóstico
-    console.log("🔍 Verificando modelos disponíveis para sua chave...");
+    
+    // DETETIVE: Lista os modelos reais no console
+    fetch(`https://generativelanguage.googleapis.com/v1/models?key=${key}`)
+      .then(res => res.json())
+      .then(data => console.log("📋 Lista Real de Modelos Disponíveis para sua chave:", data))
+      .catch(err => console.error("❌ Erro ao listar modelos:", err));
+
     return genAI;
   } catch (err) {
     console.error("❌ Erro ao instanciar GoogleGenerativeAI:", err);
@@ -171,21 +176,21 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
   } catch (error: any) {
     console.error("❌ Erro no Conselheiro Pastoral:", error);
     
-    // Se for erro 404 (modelo não encontrado), tenta os nomes mais genéricos ou versões pro/exp
+    // Se for erro 404 (modelo não encontrado), tenta os nomes mais genéricos ou versões pro
     if (error?.message?.includes('404') || error?.message?.includes('not found')) {
-      console.warn("🔄 Tentando Pro/Exp fallback devido a erro 404...");
+      console.log("🔄 Tentando outros modelos (Pro/Flash-Latest) devido ao erro 404...");
       try {
-        const modelFallback = genAI.getGenerativeModel({ model: "gemini-pro" });
-        const result = await modelFallback.generateContent(userMessage);
-        return result.response.text();
-      } catch (e) {
-        try {
-           const modelExp = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-           const resultExp = await modelExp.generateContent(userMessage);
-           return resultExp.response.text();
-        } catch (err) {
-           return "Desculpe, tive um problema técnico ao processar sua mensagem. Mas lembre-se: o amor sacrificial é o caminho. Tente perguntar novamente em instantes.";
+        const fallbackModels = ["gemini-1.5-flash-latest", "gemini-pro", "gemini-1.5-pro"];
+        for (const modelName of fallbackModels) {
+           try {
+             const modelFallback = genAI.getGenerativeModel({ model: modelName }, { apiVersion: 'v1' });
+             const chatFallback = modelFallback.startChat();
+             const res = await chatFallback.sendMessage(`INSTRUÇÃO DE PERSONA: ${persona}\n\nMENSAGEM: ${userMessage}`);
+             return res.response.text();
+           } catch (e) { /* continue to next fallback */ }
         }
+      } catch (fallbackError) {
+        console.error("❌ Todos os fallbacks falharam:", fallbackError);
       }
     }
     
