@@ -24,16 +24,10 @@ const getApiKey = () => {
 
 const createAiClient = () => {
   const key = getApiKey();
+  if (!key) return null;
+  
   try {
-    const genAI = new GoogleGenerativeAI(key);
-    
-    // DETETIVE: Lista os modelos reais no console
-    fetch(`https://generativelanguage.googleapis.com/v1/models?key=${key}`)
-      .then(res => res.json())
-      .then(data => console.log("📋 Lista Real de Modelos Disponíveis para sua chave:", data))
-      .catch(err => console.error("❌ Erro ao listar modelos:", err));
-
-    return genAI;
+    return new GoogleGenerativeAI(key);
   } catch (err) {
     console.error("❌ Erro ao instanciar GoogleGenerativeAI:", err);
     return null;
