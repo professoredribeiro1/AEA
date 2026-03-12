@@ -14,15 +14,12 @@ const getApiKey = () => {
   
   const key = envKey || processKey;
               
-  if (key && key !== 'undefined' && key !== 'null' && key.length > 10) {
-    console.log(`✅ Chave detectada via Ambiente (Vercel/Vite): ${key.substring(0, 4)}...${key.substring(key.length - 4)}`);
+  if (key && key !== 'undefined' && key !== 'null' && key.length > 20) {
     return key.trim();
   }
 
-  // Se não achar no ambiente, usa esta que você acabou de criar
-  const fallback = 'AIzaSyBpRdN0AEZR1ior8p9UP6mOr_vtrhsKLfQ';
-  console.log(`⚠️ Usando chave de reserva: ${fallback.substring(0, 4)}...${fallback.substring(fallback.length - 4)}`);
-  return fallback;
+  // Sua chave nova oficial (final BuWE)
+  return 'AIzaSyDDCjoR8XFmJsNPwNpnm56PXVn24FlBuWE';
 };
 
 const createAiClient = () => {
