@@ -8,15 +8,21 @@ import { LoveLanguage, Mission } from "../types";
  * even if environment variables are not immediately available.
  */
 const getApiKey = () => {
-  // Pega a chave e remove qualquer espaço em branco acidental
-  const key = (import.meta as any).env?.VITE_GEMINI_API_KEY || 
-              (window as any).process?.env?.VITE_GEMINI_API_KEY;
+  // Tenta pegar do Vercel/Vite
+  const envKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+  const processKey = (window as any).process?.env?.VITE_GEMINI_API_KEY;
+  
+  const key = envKey || processKey;
               
-  const finalKey = (key && key !== 'undefined' && key !== 'null') 
-    ? key 
-    : 'AIzaSyBpRdN0AEZR1ior8p9UP6mOr_vtrhsKLfQ';
+  if (key && key !== 'undefined' && key !== 'null' && key.length > 10) {
+    console.log(`✅ Chave detectada via Ambiente (Vercel/Vite): ${key.substring(0, 4)}...${key.substring(key.length - 4)}`);
+    return key.trim();
+  }
 
-  return finalKey.trim();
+  // Se não achar no ambiente, usa esta que você acabou de criar
+  const fallback = 'AIzaSyBpRdN0AEZR1ior8p9UP6mOr_vtrhsKLfQ';
+  console.log(`⚠️ Usando chave de reserva: ${fallback.substring(0, 4)}...${fallback.substring(fallback.length - 4)}`);
+  return fallback;
 };
 
 const createAiClient = () => {
