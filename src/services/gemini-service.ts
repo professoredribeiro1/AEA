@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { LoveLanguage, Mission } from "../types";
 
 /**
@@ -8,8 +8,12 @@ import { LoveLanguage, Mission } from "../types";
  * even if environment variables are not immediately available.
  */
 const getApiKey = () => {
-  const viteKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (viteKey && viteKey !== 'undefined' && viteKey !== 'null') return viteKey;
+  try {
+    const viteKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+    if (viteKey && viteKey !== 'undefined' && viteKey !== 'null') return viteKey;
+  } catch (e) {
+    console.warn("⚠️ Não foi possível ler import.meta.env");
+  }
 
   // Fallback key specific to this project
   return 'AIzaSyDlgHHkSZVCZpzO2jes54RJ6dnCXqjdIIg';
@@ -18,9 +22,9 @@ const getApiKey = () => {
 const createAiClient = () => {
   const key = getApiKey();
   try {
-    return new GoogleGenAI(key);
+    return new GoogleGenerativeAI(key);
   } catch (err) {
-    console.error("❌ Erro ao instanciar GoogleGenAI:", err);
+    console.error("❌ Erro ao instanciar GoogleGenerativeAI:", err);
     return null;
   }
 };
@@ -36,8 +40,6 @@ export const generateDailyMission = async (
   const genAI = createAiClient();
   if (!genAI) return { title: 'IA Indisponível', description: 'Erro ao conectar-se com o assistente.', rationale: '' };
 
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
   const themes = [
     "Fundação e Reconexão Básica",
     "Intimidade e Vulnerabilidade",
@@ -47,39 +49,43 @@ export const generateDailyMission = async (
   ];
   const currentTheme = themes[(cycleNumber - 1) % themes.length];
 
-  try {
-    const prompt = `Gere uma missão prática de "Amor Sacrificial" ${isLighter ? 'LEVE E SUAVE ' : ''}para o dia ${dayNumber} do Ciclo ${cycleNumber} (Tema: ${currentTheme}). O alvo é "${targetName}" e sua linguagem do amor predominante é "${targetLanguage}".
-      ${rejectedDescriptions.length > 0 ? `EVITE as seguintes ideias ou descrições que já foram recusadas: ${rejectedDescriptions.join('; ')}` : ''}`;
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash",
+    generationConfig: {
+      responseMimeType: "application/json",
+    },
+    systemInstruction: {
+      role: 'system',
+      parts: [{
+        text: `Você é um mentor de relacionamentos especialista no método de Gary Chapman.
+      SEU OBJETIVO: Criar uma tarefa simples, curta e potente que fortaleça o vínculo com ${targetName} através da linguagem "${targetLanguage}".
+      
+      ${isLighter ? 'REQUISITO ESPECIAL: Esta missão deve ser EXTREMAMENTE LEVE, PASSIVA e TOTALMENTE DIFERENTE da missão anterior. Ela deve ser focada em pequenos gestos que não exijam quase nenhum esforço emocional ou interação direta obrigatória.' : ''}
 
+      CONTEXTO DO CICLO:
+      Estamos no Ciclo ${cycleNumber} com o tema "${currentTheme}". 
+      ${cycleNumber === 1 ? 'Foque em ações simples de reconexão.' : 'Foque em ações mais profundas, criativas e que exijam maior entrega emocional.'}
+
+      REGRAS PARA A MISSÃO:
+      1. SIMPLICIDADE ABSOLUTA: A tarefa deve ser realizável em menos de 15 minutos e não deve exigir gastos financeiros significativos.
+      2. REPLICABILIDADE: Foque em ações que possam se tornar hábitos.
+      3. CONEXÃO DIRETA: A missão deve atingir o coração da linguagem "${targetLanguage}". 
+      
+      RETORNE APENAS JSON COM ESTES CAMPOS:
+      {
+        "title": "Nome curto e acionável",
+        "description": "Instrução passo a passo",
+        "rationale": "Por que isso é poderoso para quem fala ${targetLanguage}"
+      }` }]
+    }
+  });
+
+  const prompt = `Gere uma missão prática de "Amor Sacrificial" ${isLighter ? 'LEVE E SUAVE ' : ''}para o dia ${dayNumber} do Ciclo ${cycleNumber} (Tema: ${currentTheme}). O alvo é "${targetName}" e sua linguagem do amor predominante é "${targetLanguage}".
+    ${rejectedDescriptions.length > 0 ? `EVITE as seguintes ideias ou descrições que já foram recusadas: ${rejectedDescriptions.join('; ')}` : ''}`;
+
+  try {
     const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-      },
-      systemInstruction: {
-        role: 'system',
-        parts: [{
-          text: `Você é um mentor de relacionamentos especialista no método de Gary Chapman.
-        SEU OBJETIVO: Criar uma tarefa simples, curta e potente que fortaleça o vínculo com ${targetName} através da linguagem "${targetLanguage}".
-        
-        ${isLighter ? 'REQUISITO ESPECIAL: Esta missão deve ser EXTREMAMENTE LEVE, PASSIVA e TOTALMENTE DIFERENTE da missão anterior. Ela deve ser focada em pequenos gestos que não exijam quase nenhum esforço emocional ou interação direta obrigatória.' : ''}
-  
-        CONTEXTO DO CICLO:
-        Estamos no Ciclo ${cycleNumber} com o tema "${currentTheme}". 
-        ${cycleNumber === 1 ? 'Foque em ações simples de reconexão.' : 'Foque em ações mais profundas, criativas e que exijam maior entrega emocional.'}
-  
-        REGRAS PARA A MISSÃO:
-        1. SIMPLICIDADE ABSOLUTA: A tarefa deve ser realizável em menos de 15 minutos e não deve exigir gastos financeiros significativos.
-        2. REPLICABILIDADE: Foque em ações que possam se tornar hábitos.
-        3. CONEXÃO DIRETA: A missão deve atingir o coração da linguagem "${targetLanguage}". 
-        
-        RETORNE APENAS JSON COM ESTES CAMPOS:
-        {
-          "title": "Nome curto e acionável",
-          "description": "Instrução passo a passo",
-          "rationale": "Por que isso é poderoso para quem fala ${targetLanguage}"
-        }` }]
-      }
+      contents: [{ role: 'user', parts: [{ text: prompt }] }]
     });
 
     const text = result.response.text();
@@ -102,7 +108,28 @@ export const getMissionCompletionFeedback = async (
   const genAI = createAiClient();
   if (!genAI) return { feedback: "IA offline", impact: 0, success: false };
 
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash",
+    generationConfig: {
+      responseMimeType: "application/json",
+    },
+    systemInstruction: {
+      role: 'system',
+      parts: [{
+        text: `Analise o relato de cumprimento.
+      - Valorize a consistência e a intenção.
+      - Se o usuário descreveu o que fez com sinceridade, success é true.
+      - Ofereça um feedback encorajador.
+      - Impact: Atribua de 0.3 a 1.5.
+
+      RETORNE APENAS JSON:
+      {
+        "feedback": "Texto encorajador",
+        "impact": 0.5,
+        "success": true
+      }` }]
+    }
+  });
 
   try {
     const prompt = `Missão: "${mission.title}". 
@@ -111,26 +138,7 @@ export const getMissionCompletionFeedback = async (
       Avalie o cumprimento desta pequena meta diária para ${partnerName}.`;
 
     const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: {
-        responseMimeType: "application/json",
-      },
-      systemInstruction: {
-        role: 'system',
-        parts: [{
-          text: `Analise o relato de cumprimento.
-        - Valorize a consistência e a intenção.
-        - Se o usuário descreveu o que fez com sinceridade, success é true.
-        - Ofereça um feedback encorajador.
-        - Impact: Atribua de 0.3 a 1.5.
-
-        RETORNE APENAS JSON:
-        {
-          "feedback": "Texto encorajador",
-          "impact": 0.5,
-          "success": true
-        }` }]
-      }
+      contents: [{ role: 'user', parts: [{ text: prompt }] }]
     });
 
     return JSON.parse(result.response.text());
@@ -147,7 +155,10 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
   try {
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
-      systemInstruction: "Você é o 'Conselheiro Pastoral' de felicidade conjugal. PERSONA: Prático, acolhedor e focado em soluções baseadas em princípios bíblicos e sabedoria prática. Defensor de que 'pequenas coisas feitas com muito amor mudam o mundo'. OBJETIVO: Transformar conflitos em oportunidades de serviço e crescimento. Sugerir micro-ações imediatas para melhorar o clima da casa."
+      systemInstruction: {
+        role: 'system',
+        parts: [{ text: "Você é o 'Conselheiro Pastoral' de felicidade conjugal. PERSONA: Prático, acolhedor e focado em soluções baseadas em princípios bíblicos e sabedoria prática. Defensor de que 'pequenas coisas feitas com muito amor mudam o mundo'. OBJETIVO: Transformar conflitos em oportunidades de serviço e crescimento. Sugerir micro-ações imediatas para melhorar o clima da casa." }]
+      }
     });
 
     // Filtra o histórico para garantir que está no formato correto
