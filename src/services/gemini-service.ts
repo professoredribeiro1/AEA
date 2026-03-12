@@ -158,28 +158,11 @@ export const getCoachAdvice = async (history: { role: string, parts: { text: str
   if (!genAI) return "O Conselheiro Pastoral está offline no momento. Tente novamente mais tarde.";
 
   try {
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash", 
-      systemInstruction: {
-        role: 'system',
-        parts: [{ text: "Você é o 'Conselheiro Pastoral' de felicidade conjugal. PERSONA: Prático, acolhedor e focado em soluções baseadas em princípios bíblicos e sabedoria prática. Defensor de que 'pequenas coisas feitas com muito amor mudam o mundo'. OBJETIVO: Transformar conflitos em oportunidades de serviço e crescimento. Sugerir micro-ações imediatas para melhorar o clima da casa." }]
-      }
-    }, { apiVersion: 'v1' });
-
-    // O Gemini exige que o histórico comece com 'user'. 
-    // Se a primeira mensagem for 'model', nós a removemos do histórico enviado.
-    let formattedHistory = history.map(h => ({
-      role: h.role === 'model' ? 'model' : 'user',
-      parts: h.parts
-    }));
-
-    if (formattedHistory.length > 0 && formattedHistory[0].role === 'model') {
-      formattedHistory.shift();
-    }
-
-    const chat = model.startChat({
-      history: formattedHistory,
-    });
+    // Usamos o modelo 'gemini-1.5-flash' que é o mais comum da versão v1
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    
+    // Inicia o chat sem histórico complicado para evitar erros de validação
+    const chat = model.startChat();
 
     const result = await chat.sendMessage(userMessage);
     return result.response.text();
