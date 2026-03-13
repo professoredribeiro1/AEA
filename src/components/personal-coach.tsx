@@ -50,12 +50,7 @@ const PersonalCoach: React.FC = () => {
     setInput('');
     setIsTyping(true);
 
-    try {
-      const history = messages.map(m => ({
-        role: m.role,
-        parts: [{ text: m.text }]
-      }));
-      const response = await getCoachAdvice(history, text);
+      const response = await getCoachAdvice(text);
       const botMsg: Message = { role: 'model', text: response, timestamp: new Date().toISOString() };
       setMessages(prev => [...prev, botMsg]);
     } catch (e) {
