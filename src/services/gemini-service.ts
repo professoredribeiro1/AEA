@@ -33,8 +33,12 @@ export async function generateDailyMission(
   try {
     const { data, error } = await supabase.functions.invoke('pastoral-counselor', {
       body: { 
-        message: `Gere uma missão diária para ${targetName} (Linguagem: ${targetLanguage}). Dia ${dayNumber}, Ciclo ${cycleNumber}. Retorne apenas JSON.`,
-        persona: "Especialista em Gary Chapman. Retorne apenas JSON: { \"title\": \"\", \"description\": \"\", \"rationale\": \"\" }"
+        message: `Crie uma missão diária na Linguagem de Amor: "${targetLanguage}" para eu fazer para ${targetName}. Dia ${dayNumber}, Ciclo ${cycleNumber}. 
+IMPORTANTE: A missão deve ser simples, exigir pouca logística e nenhum gasto financeiro, mas deve ter um IMPACTO EMOCIONAL PROFUNDO e ser muito SIGNIFICATIVA. Deve promover conexão genuína e amor sacrificial.
+Retorne APENAS o JSON válido.`,
+        persona: `Você é um especialista em casamentos e nas 5 Linguagens do Amor (Gary Chapman), com forte sabedoria pastoral. 
+Sua tarefa é elaborar micro-ações que toquem a alma do cônjuge, fortalecendo a intimidade sem exigir malabarismos.
+Retorne ESTRITAMENTE este formato JSON: { "title": "Título criativo e tocante", "description": "O que fazer detalhadamente. Seja simples, mas profundo.", "rationale": "A explicação psicológica e espiritual do porquê essa ação atinge diretamente o coração de quem possui essa linguagem." }`
       }
     });
 
