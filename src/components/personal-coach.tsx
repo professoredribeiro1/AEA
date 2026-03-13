@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { getCoachAdvice } from '../services/gemini-service';
 import { Message } from '../types';
@@ -36,7 +35,6 @@ const PersonalCoach: React.FC = () => {
   const handleScroll = () => {
     if (chatContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-      // Se a distância do fundo for maior que 150px, mostra o botão
       const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
       setShowScrollBtn(!isNearBottom);
     }
@@ -50,6 +48,7 @@ const PersonalCoach: React.FC = () => {
     setInput('');
     setIsTyping(true);
 
+    try {
       const response = await getCoachAdvice(text);
       const botMsg: Message = { role: 'model', text: response, timestamp: new Date().toISOString() };
       setMessages(prev => [...prev, botMsg]);
@@ -158,7 +157,7 @@ const PersonalCoach: React.FC = () => {
           <div ref={scrollRef} className="h-4" />
         </div>
 
-        {/* Botão Flutuante de Scroll (Posicionado no container de mensagens) */}
+        {/* Botão Flutuante de Scroll */}
         {showScrollBtn && (
           <button
             onClick={scrollToBottom}
@@ -172,7 +171,6 @@ const PersonalCoach: React.FC = () => {
 
       {/* Input Section Fixo na Base */}
       <div className="p-6 bg-white border-t border-indigo-50 shrink-0 z-20">
-        {/* Real-time Visualization */}
         {input && (
           <div className="mb-4 px-5 py-3 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-center gap-3 animate-in slide-in-from-bottom-2 duration-300">
             <Eye className="w-4 h-4 text-indigo-600" />
