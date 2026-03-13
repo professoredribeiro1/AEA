@@ -12,7 +12,7 @@ import CoupleConnection from './components/couple-connection';
 import MyChallenges from './components/my-challenges';
 import GratitudeJournal from './components/gratitude-journal';
 import LandingPage from './components/landing-page';
-import { generateDailyMission, getMissionCompletionFeedback } from './services/gemini-service';
+import { generateDailyMission, validateMission } from './services/gemini-service';
 import { supabase } from './services/supabase';
 import {
   Heart, Sparkles, Calendar, Trophy,
@@ -130,7 +130,7 @@ const App: React.FC = () => {
               name: partnerProfile.full_name || 'Parceiro(a)',
               tankLevel: partnerProfile.tank_level ?? 5,
               languages: partnerProfile.languages || [],
-              challenge: partnerProfile.challenge || prev.challenge,
+              
               isLinked: true,
               partnerId: profile.partner_id
             }));
@@ -169,7 +169,7 @@ const App: React.FC = () => {
               tankLevel: payload.new.tank_level !== undefined ? payload.new.tank_level : prev.tankLevel,
               languages: payload.new.languages !== undefined ? payload.new.languages : prev.languages,
               name: payload.new.full_name !== undefined ? payload.new.full_name || 'Parceiro(a)' : prev.name,
-              challenge: payload.new.challenge !== undefined ? payload.new.challenge : prev.challenge,
+              
             }));
           }
         }
@@ -211,7 +211,7 @@ const App: React.FC = () => {
                 name: partnerProfile.full_name || 'Parceiro(a)',
                 tankLevel: partnerProfile.tank_level ?? 5,
                 languages: partnerProfile.languages || [],
-                challenge: partnerProfile.challenge || prev.challenge,
+                
                 isLinked: true,
                 partnerId: partnerProfile.id
               }));
@@ -242,16 +242,16 @@ const App: React.FC = () => {
   };
 
   const handleRedoMission = (id: string) => {
-    const mission = partner.challenge.missions.find(m => m.id === id);
+    const mission = user.challenge.missions.find(m => m.id === id);
     if (!mission) return;
 
     // Se o usuário quiser refazer uma missão já concluída
     if (mission.completed) {
-      const updatedMissions = partner.challenge.missions.map(m =>
+      const updatedMissions = user.challenge.missions.map(m =>
         m.id === id ? { ...m, completed: false, aiFeedback: undefined } : m
       );
-      const newChallenge = { ...partner.challenge, missions: updatedMissions };
-      setPartner(prev => ({
+      const newChallenge = { ...user.challenge, missions: updatedMissions };
+      setUser(prev => ({
         ...prev,
         challenge: newChallenge
       }));
@@ -266,9 +266,9 @@ const App: React.FC = () => {
       setLoadingMission(true);
       setIsReadyForMission(false);
       if (partner.languages.length >= 2 && user.isLinked) {
-        const cycle = (partner.challenge.cycleCount || 1) + 1;
+        const cycle = (user.challenge.cycleCount || 1) + 1;
         const targetLang = partner.languages[0];
-        const d = await generateDailyMission(targetLang, partner.name, 1, cycle);
+        const d = await generateDailyMission(partner.name, targetLang, 1, cycle);
         const newChallenge: Challenge = {
           ...emptyChallenge,
           type: 60,
@@ -284,7 +284,7 @@ const App: React.FC = () => {
             languageApplied: targetLang
           }]
         };
-        setPartner(p => ({ ...p, challenge: newChallenge }));
+        setUser(p => ({ ...p, challenge: newChallenge }));
         if (supabaseUserId) updateChallenge(supabaseUserId, newChallenge);
         setLoadingMission(false);
         setActiveTab('challenge');
@@ -300,10 +300,10 @@ const App: React.FC = () => {
     setLoadingMission(true);
     try {
       const targetLang = mission.languageApplied || partner.languages[0];
-      const currentCycle = partner.challenge.cycleCount || 1;
+      const currentCycle = user.challenge.cycleCount || 1;
 
       const newRejectedList = [...(mission.rejectedDescriptions || []), mission.description];
-      const lighterData = await generateDailyMission(targetLang, partner.name, mission.day, currentCycle, true, newRejectedList);
+      const lighterData = await generateDailyMission(partner.name, targetLang, mission.day, currentCycle, true, newRejectedList);
 
       const lighterMission: Mission = {
         id: Math.random().toString(36).substr(2, 9),
@@ -318,12 +318,12 @@ const App: React.FC = () => {
         rejectedDescriptions: newRejectedList
       };
 
-      const updatedMissions = partner.challenge.missions.map(m =>
+      const updatedMissions = user.challenge.missions.map(m =>
         m.id === mission.id ? lighterMission : m
       );
 
-      const newChallenge = { ...partner.challenge, missions: updatedMissions };
-      setPartner(prev => ({
+      const newChallenge = { ...user.challenge, missions: updatedMissions };
+      setUser(prev => ({
         ...prev,
         challenge: newChallenge
       }));
@@ -347,23 +347,23 @@ const App: React.FC = () => {
     setLoadingMission(true);
     setAiInsight(null);
     try {
-      const result = await getMissionCompletionFeedback(mission, partner.name, fulfillmentText);
+      const result = await validateMission(mission, fulfillmentText, partner.name);
       const { feedback, impact = 0, success } = result;
 
       if (success) {
         setShowCelebration(true);
         setIsReadyForMission(false);
         setTimeout(() => setShowCelebration(false), 4000);
-        const updatedMissions = partner.challenge.missions.map(m =>
+        const updatedMissions = user.challenge.missions.map(m =>
           m.id === mission.id ? { ...m, completed: true, completedAt: new Date().toISOString(), aiFeedback: feedback } : m
         );
         const nextDay = mission.day + 1;
-        const currentCycle = partner.challenge.cycleCount || 1;
+        const currentCycle = user.challenge.cycleCount || 1;
 
-        if (nextDay <= (partner.challenge.type || 0)) {
+        if (nextDay <= (user.challenge.type || 0)) {
           // Alterna estritamente entre as 2 linguagens principais do parceiro
           const targetLang = nextDay % 2 !== 0 ? partner.languages[0] : (partner.languages[1] || partner.languages[0]);
-          const nextData = await generateDailyMission(targetLang, partner.name, nextDay, currentCycle);
+          const nextData = await generateDailyMission(partner.name, targetLang, nextDay, currentCycle);
           updatedMissions.push({
             id: Math.random().toString(36).substr(2, 9),
             day: nextDay,
@@ -378,30 +378,29 @@ const App: React.FC = () => {
           if (confirm(`Parabéns! Você completou o Ciclo ${currentCycle} de 60 dias! Deseja iniciar o Ciclo ${currentCycle + 1} com um novo tema avançado?`)) {
             const nextCycle = currentCycle + 1;
             const targetLang = partner.languages[0];
-            const nextData = await generateDailyMission(targetLang, partner.name, 1, nextCycle);
-            setPartner(prev => ({
-              ...prev,
-              challenge: {
-                ...prev.challenge,
-                missions: [{
-                  id: Math.random().toString(36).substr(2, 9),
-                  day: 1,
-                  title: nextData.title!,
-                  description: nextData.description!,
-                  rationale: nextData.rationale!,
-                  completed: false,
-                  languageApplied: targetLang
-                }],
-                cycleCount: nextCycle,
-                startDate: new Date().toISOString()
-              }
-            }));
+            const nextData = await generateDailyMission(partner.name, targetLang, 1, nextCycle);
+            const newCycleChallenge: Challenge = {
+              ...user.challenge,
+              missions: [{
+                id: Math.random().toString(36).substr(2, 9),
+                day: 1,
+                title: nextData.title!,
+                description: nextData.description!,
+                rationale: nextData.rationale!,
+                completed: false,
+                languageApplied: targetLang
+              }],
+              cycleCount: nextCycle,
+              startDate: new Date().toISOString()
+            };
+            setUser(prev => ({ ...prev, challenge: newCycleChallenge }));
+            if (supabaseUserId) updateChallenge(supabaseUserId, newCycleChallenge);
             setLoadingMission(false);
             return;
           }
         }
-        const newChallenge = { ...partner.challenge, missions: updatedMissions };
-        setPartner(prev => ({
+        const newChallenge = { ...user.challenge, missions: updatedMissions };
+        setUser(prev => ({
           ...prev,
           tankLevel: Math.min(10, parseFloat((prev.tankLevel + (impact || 0)).toFixed(1))),
           challenge: newChallenge
@@ -436,7 +435,7 @@ const App: React.FC = () => {
         name: partnerProfile.full_name || 'Parceiro(a)',
         tankLevel: partnerProfile.tank_level ?? 5,
         languages: partnerProfile.languages || [],
-        challenge: partnerProfile.challenge || prev.challenge,
+        
         isLinked: true,
         partnerId: partnerProfile.id
       }));
@@ -526,7 +525,7 @@ const App: React.FC = () => {
                       }}
                       className="px-10 py-5 bg-rose-600 text-white rounded-[2rem] font-black text-lg hover:bg-rose-700 transition-all shadow-2xl shadow-rose-200 flex items-center gap-3"
                     >
-                      {partner.challenge.type ? 'Abrir Missão' : 'Iniciar 60 Dias'} <ChevronRight className="w-5 h-5" />
+                      {user.challenge.type ? 'Abrir Missão' : 'Iniciar 60 Dias'} <ChevronRight className="w-5 h-5" />
                     </button>
                     <button onClick={() => setActiveTab('coach')} className="px-8 py-5 bg-white border border-rose-100 text-rose-900 rounded-[2rem] font-bold text-lg hover:bg-rose-50 transition-all flex items-center gap-3 shadow-sm">
                       Aconselhamento Pastoral <Compass className="w-5 h-5 text-rose-400" />
@@ -536,10 +535,10 @@ const App: React.FC = () => {
                 <div className="w-full md:w-1/3 flex justify-center">
                   <div className="w-48 h-48 bg-rose-50 rounded-[3rem] flex items-center justify-center relative animate-float">
                     <Calendar className="w-20 h-20 text-rose-500" />
-                    {partner.challenge.missions.length > 0 && (
+                    {user.challenge.missions.length > 0 && (
                       <div className="absolute -top-4 -right-4 bg-indigo-600 text-white w-14 h-14 rounded-full flex flex-col items-center justify-center font-black shadow-xl">
                         <span className="text-[10px] uppercase leading-none">Dia</span>
-                        <span className="text-xl">{partner.challenge.missions.filter(m => m.completed).length}</span>
+                        <span className="text-xl">{user.challenge.missions.filter(m => m.completed).length}</span>
                       </div>
                     )}
                   </div>
@@ -591,7 +590,7 @@ const App: React.FC = () => {
         );
       case 'quiz': return <Quiz onComplete={(res) => { setUser(prev => ({ ...prev, languages: res })); setActiveTab('dashboard'); if (supabaseUserId) updateLanguages(supabaseUserId, res); }} />;
       case 'challenge':
-        const challenge = partner.challenge;
+        const challenge = user.challenge;
         if (!challenge.type) {
           return (
             <div className="max-w-4xl mx-auto py-12 px-4 text-center">
@@ -599,28 +598,18 @@ const App: React.FC = () => {
                 <div className="w-24 h-24 bg-rose-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10"><Calendar className="w-12 h-12 text-rose-600" /></div>
                 <h2 className="text-5xl font-black text-rose-950 mb-8 tracking-tight">Comece a Semear</h2>
                 <p className="text-slate-500 text-xl mb-12 max-w-2xl mx-auto font-medium">60 dias de Amor Sacrificial transformarão seu casamento em algo duradouro e prazeroso.</p>
-                {partner.languages.length >= 2 && user.isLinked ? (
-                  <button onClick={async () => {
-                    setLoadingMission(true);
-                    const targetLang = partner.languages[0];
-                    const d = await generateDailyMission(targetLang, partner.name, 1);
-                    const newChallenge: Challenge = { type: 60, startDate: new Date().toISOString(), cycleCount: 1, missions: [{ id: Math.random().toString(36).substr(2, 9), day: 1, title: d.title!, description: d.description!, rationale: d.rationale!, completed: false, languageApplied: targetLang }] };
-                    setPartner(p => ({ ...p, challenge: newChallenge }));
-                    if (supabaseUserId) updateChallenge(supabaseUserId, newChallenge);
-                    setLoadingMission(false);
-                  }} className="w-full max-w-md bg-rose-600 p-8 rounded-[2.5rem] hover:bg-rose-700 transition-all text-white group shadow-2xl">
-                    <span className="block font-black text-3xl mb-1 uppercase tracking-tighter">Ativar Desafio</span>
-                    <span className="text-rose-100 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"><Sparkles className="w-3 h-3" /> Receber Primeira Missão</span>
-                  </button>
-                ) : (
-                  <div className="space-y-6 flex flex-col items-center">
-                    <p className="text-rose-600 font-bold bg-rose-50 px-6 py-3 rounded-2xl border border-rose-100 italic">
-                      "Para semear no coração de quem você ama, primeiro precisamos saber o que ele(a) valoriza."
-                    </p>
-                    <p className="text-slate-400 text-sm max-w-md">Conecte-se com seu parceiro para liberar as missões baseadas nas linguagens de amor reais dele(a).</p>
-                    <button onClick={() => setActiveTab('connection')} className="w-full max-w-md bg-slate-900 p-8 rounded-[2.5rem] hover:bg-black transition-all text-white font-black text-2xl uppercase tracking-tighter flex items-center justify-center gap-4 shadow-2xl">Conectar Agora <UserPlus className="w-6 h-6" /></button>
-                  </div>
-                )}
+                <button onClick={async () => {
+                  setLoadingMission(true);
+                  const targetLang = partner.languages.length > 0 ? partner.languages[0] : "Palavras de Afirmação";
+                  const d = await generateDailyMission(partner.name || "meu amor", targetLang, 1, 1);
+                  const newChallenge: Challenge = { type: 60, startDate: new Date().toISOString(), cycleCount: 1, missions: [{ id: Math.random().toString(36).substr(2, 9), day: 1, title: d.title!, description: d.description!, rationale: d.rationale!, completed: false, languageApplied: targetLang }] };
+                  setUser(p => ({ ...p, challenge: newChallenge }));
+                  if (supabaseUserId) updateChallenge(supabaseUserId, newChallenge);
+                  setLoadingMission(false);
+                }} className="w-full max-w-md bg-rose-600 p-8 rounded-[2.5rem] hover:bg-rose-700 transition-all text-white group shadow-2xl">
+                  <span className="block font-black text-3xl mb-1 uppercase tracking-tighter">Ativar Desafio</span>
+                  <span className="text-rose-100 text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2"><Sparkles className="w-3 h-3" /> Receber Primeira Missão</span>
+                </button>
               </div>
             </div>
           );
@@ -687,7 +676,7 @@ const App: React.FC = () => {
         );
       case 'coach': return <PersonalCoach />;
       case 'gratitude': return <GratitudeJournal entries={user.gratitudeJournal || []} onAddEntry={(e) => setUser(p => ({ ...p, gratitudeJournal: [...p.gratitudeJournal, { ...e, id: Math.random().toString(), date: new Date().toISOString() }] }))} onDeleteEntry={(id) => setUser(p => ({ ...p, gratitudeJournal: p.gratitudeJournal.filter(x => x.id !== id) }))} />;
-      case 'myChallenges': return <MyChallenges challenge={partner.challenge} partnerName={partner.name} onRedoMission={handleRedoMission} onGoToChallenge={() => setActiveTab('challenge')} />;
+      case 'myChallenges': return <MyChallenges challenge={user.challenge} partnerName={partner.name} onRedoMission={handleRedoMission} onGoToChallenge={() => setActiveTab('challenge')} />;
       case 'connection': return <CoupleConnection userCode={user.coupleCode || 'ABCD-123'} onLink={handleLinkPartner} linkedPartner={user.isLinked ? partner.name : undefined} />;
       default: return null;
     }
@@ -771,3 +760,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
