@@ -575,14 +575,20 @@ const App: React.FC = () => {
 
               <div className="bg-white p-10 rounded-[3.5rem] border border-rose-50/50 shadow-sm flex flex-col justify-center min-h-[160px] hover:shadow-md transition-shadow">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Linguagens de {partner.name}</p>
-                {partner.languages.length > 0 && user.isLinked ? (
-                  <div className="flex flex-wrap gap-3">
-                    {partner.languages.map(l => (
-                      <div key={l} className="px-5 py-2.5 bg-rose-50 text-rose-600 rounded-2xl text-xs font-black border border-rose-100 flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-rose-400 rounded-full" /> {l}
-                      </div>
-                    ))}
-                  </div>
+                {user.isLinked ? (
+                  partner.languages.length > 0 ? (
+                    <div className="flex flex-wrap gap-3">
+                      {partner.languages.map(l => (
+                        <div key={l} className="px-5 py-2.5 bg-rose-50 text-rose-600 rounded-2xl text-xs font-black border border-rose-100 flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 bg-rose-400 rounded-full" /> {l}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-left text-sm font-bold text-slate-400 italic">
+                      Aguardando {partner.name} realizar ou atualizar o Teste de Linguagens...
+                    </div>
+                  )
                 ) : (
                   <button onClick={() => setActiveTab('connection')} className="text-left text-2xl font-black text-rose-600 hover:text-rose-700 transition-colors flex items-center gap-2 group">
                     Conectar com Parceiro <ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
