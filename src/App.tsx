@@ -105,21 +105,30 @@ const App: React.FC = () => {
 
       const profile = await fetchMyProfile(userId);
       if (profile) {
-        setUser(prev => ({
-          ...prev,
-          name: profile.full_name || prev.name || 'Usuário',
-          tankLevel: profile.tank_level ?? prev.tankLevel,
-          languages: (profile.languages?.length > 0) ? profile.languages : prev.languages,
-          challenge: profile.challenge || prev.challenge,
-          coupleCode: profile.couple_code || code,
-          isLinked: !!profile.partner_id,
-          subscription: {
-            status: (profile.subscription_status === 'trialing' || profile.subscription_status === 'active') ? profile.subscription_status as any : 'expired',
-            plan: (profile.plan_type as any) || 'none',
-            trialStartedAt: prev.subscription.trialStartedAt,
-            expiresAt: profile.expires_at
+        setUser(prev => {
+          if ((!profile.languages || profile.languages.length === 0) && prev.languages.length > 0) {
+            updateLanguages(userId, prev.languages);
           }
-        }));
+          if ((!profile.challenge || !profile.challenge.type) && prev.challenge && prev.challenge.type) {
+            updateChallenge(userId, prev.challenge);
+          }
+
+          return {
+            ...prev,
+            name: profile.full_name || prev.name || 'Usuário',
+            tankLevel: profile.tank_level ?? prev.tankLevel,
+            languages: (profile.languages?.length > 0) ? profile.languages : prev.languages,
+            challenge: profile.challenge || prev.challenge,
+            coupleCode: profile.couple_code || code,
+            isLinked: !!profile.partner_id,
+            subscription: {
+              status: (profile.subscription_status === 'trialing' || profile.subscription_status === 'active') ? profile.subscription_status as any : 'expired',
+              plan: (profile.plan_type as any) || 'none',
+              trialStartedAt: prev.subscription.trialStartedAt,
+              expiresAt: profile.expires_at
+            }
+          };
+        });
 
         // Se tiver parceiro vinculado, carrega o perfil dele
         if (profile.partner_id) {
