@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { getCoachAdvice } from '../services/gemini-service';
 import { Message } from '../types';
