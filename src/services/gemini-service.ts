@@ -65,3 +65,6 @@ export async function validateMission(
     return { feedback: "Sua dedicação é o mais importante!", impact: 0.5, success: true };
   }
 }
+
+// Alias para compatibilidade com App.tsx
+export const getMissionCompletionFeedback = validateMission;
