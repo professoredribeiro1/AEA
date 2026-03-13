@@ -163,10 +163,13 @@ const App: React.FC = () => {
           filter: `id=eq.${partner.partnerId}`
         },
         (payload: any) => {
-          if (payload.new && typeof payload.new.tank_level === 'number') {
+          if (payload.new) {
             setPartner(prev => ({
               ...prev,
-              tankLevel: payload.new.tank_level
+              tankLevel: payload.new.tank_level !== undefined ? payload.new.tank_level : prev.tankLevel,
+              languages: payload.new.languages !== undefined ? payload.new.languages : prev.languages,
+              name: payload.new.full_name !== undefined ? payload.new.full_name || 'Parceiro(a)' : prev.name,
+              challenge: payload.new.challenge !== undefined ? payload.new.challenge : prev.challenge,
             }));
           }
         }
@@ -177,6 +180,51 @@ const App: React.FC = () => {
       supabase.removeChannel(channel);
     };
   }, [partner.partnerId, isAuthenticated]);
+
+  // Sincronização em tempo real do PRÓPRIO perfil (ex: parceiro se conectou a você)
+  useEffect(() => {
+    if (!supabaseUserId || !isAuthenticated) return;
+
+    const channel = supabase
+      .channel('my_profile_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${supabaseUserId}`
+        },
+        async (payload: any) => {
+          if (payload.new && payload.new.partner_id) {
+            // Se recebermos um ID de parceiro e não tínhamos antes (ou era diferente)
+            setUser(prev => {
+               if (!prev.isLinked) return { ...prev, isLinked: true };
+               return prev;
+            });
+            
+            // Buscar as linguagens e perfil dele na mesma hora
+            const partnerProfile = await fetchPartnerProfile(payload.new.partner_id);
+            if (partnerProfile) {
+              setPartner(prev => ({
+                ...prev,
+                name: partnerProfile.full_name || 'Parceiro(a)',
+                tankLevel: partnerProfile.tank_level ?? 5,
+                languages: partnerProfile.languages || [],
+                challenge: partnerProfile.challenge || prev.challenge,
+                isLinked: true,
+                partnerId: partnerProfile.id
+              }));
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabaseUserId, isAuthenticated]);
 
   const handleLogin = (name: string, session?: any) => {
     setUser(prev => ({ ...prev, name }));
